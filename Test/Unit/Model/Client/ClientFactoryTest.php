@@ -8,6 +8,7 @@ use Magento\Framework\App\Area;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Exception\LocalizedException;
 use MageOS\AiBase\AiServices\Azure;
+use MageOS\AiBase\AiServices\CheaperInference;
 use MageOS\AiBase\AiServices\LmStudio;
 use MageOS\AiBase\AiServices\Ollama;
 use MageOS\AiBase\AiServices\Opper;
@@ -113,6 +114,7 @@ final class ClientFactoryTest extends TestCase
             new OpenAiCompatible($fieldFactory),
             new Azure($fieldFactory),
             new Opper($fieldFactory, $modelListFetcher),
+            new CheaperInference($fieldFactory, $modelListFetcher),
             new OpenCode($fieldFactory, $modelListFetcher),
             new OpenCodeCustom($fieldFactory, $modelListFetcher),
         ]);
@@ -648,6 +650,34 @@ final class ClientFactoryTest extends TestCase
         self::assertSame('/v3/compat/chat/completions', RecordingGenericFactory::$completionsPath);
         self::assertSame('/v3/compat/embeddings', RecordingGenericFactory::$embeddingsPath);
         self::assertSame('opper', RecordingGenericFactory::$name);
+        self::assertNull(RecordingGenericFactory::$modelCatalog);
+    }
+
+    /**
+     * Cheaper Inference runs the generic bridge against its default /v1 routes. Only the platform
+     * name is a fixed argument on its bridge entry, so the paths must stay the bridge defaults.
+     */
+    public function test_cheaper_inference_passes_its_fixed_host_and_key_to_the_generic_bridge(): void
+    {
+        $this->serviceSelector->method('getByCode')->with('cheaperinference')->willReturn([
+            new AiService('row_ci', 'cheaperinference', ['api_key' => 'ci-key', 'model' => 'gpt-5.4-mini']),
+        ]);
+        $this->clientFactory->method('create')->willReturn($this->createMock(SymfonyAiClient::class));
+        $subject = $this->newSubject(new BridgeRegistry([
+            'cheaperinference' => [
+                'factory' => RecordingGenericFactory::class,
+                'package' => 'symfony/ai-generic-platform',
+                'arguments' => ['name' => 'cheaperinference'],
+            ],
+        ]));
+
+        $subject->create('cheaperinference');
+
+        self::assertSame('https://api.cheaperinference.com', RecordingGenericFactory::$baseUrl);
+        self::assertSame('ci-key', RecordingGenericFactory::$apiKey);
+        self::assertSame('/v1/chat/completions', RecordingGenericFactory::$completionsPath);
+        self::assertSame('/v1/embeddings', RecordingGenericFactory::$embeddingsPath);
+        self::assertSame('cheaperinference', RecordingGenericFactory::$name);
         self::assertNull(RecordingGenericFactory::$modelCatalog);
     }
 

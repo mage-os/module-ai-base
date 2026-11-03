@@ -8,6 +8,7 @@ require_once __DIR__ . '/../Stubs/FieldDescriptorInterfaceFactoryStub.php';
 
 use Magento\Framework\Exception\LocalizedException;
 use MageOS\AiBase\AiServices\Anthropic;
+use MageOS\AiBase\AiServices\CheaperInference;
 use MageOS\AiBase\AiServices\Google;
 use MageOS\AiBase\AiServices\Ollama;
 use MageOS\AiBase\AiServices\OpenAi;
@@ -66,6 +67,37 @@ final class ModelListFetchTest extends TestCase
         $this->expectExceptionMessage('missing "data" list');
 
         $service->fetchModels(['api_key' => 'sk-test']);
+    }
+
+    public function test_cheaper_inference_fetches_key_scoped_models_with_bearer_header(): void
+    {
+        $this->fetcher->expects(self::once())->method('getJson')
+            ->with('https://api.cheaperinference.com/v1/models', ['Authorization' => 'Bearer ci-key'])
+            ->willReturn(['data' => [
+                ['id' => 'gpt-5.4-mini'],
+                ['id' => 'claude-sonnet-5'],
+                ['object' => 'model'],
+                ['id' => ''],
+                'invalid',
+            ]]);
+
+        $service = new CheaperInference($this->fieldFactory, $this->fetcher);
+
+        self::assertSame([
+            'gpt-5.4-mini' => 'gpt-5.4-mini',
+            'claude-sonnet-5' => 'claude-sonnet-5',
+        ], $service->fetchModels(['api_key' => 'ci-key']));
+    }
+
+    public function test_cheaper_inference_rejects_a_missing_model_list(): void
+    {
+        $this->fetcher->method('getJson')->willReturn(['error' => ['message' => 'nope']]);
+        $service = new CheaperInference($this->fieldFactory, $this->fetcher);
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage('missing "data" list');
+
+        $service->fetchModels(['api_key' => 'ci-key']);
     }
 
     public function test_opper_fetches_key_scoped_chat_models_pools_and_routes(): void

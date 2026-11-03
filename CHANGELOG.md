@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cheaper Inference provider** (`cheaperinference`, `AiServices\CheaperInference`): the
+  [Cheaper Inference](https://cheaperinference.com) gateway is now one of the registered AI
+  backends, with an API key and a free-text model field. The host is fixed at
+  `https://api.cheaperinference.com`, so the row needs no URL. **Refresh Models** reads the
+  catalogue scoped to the API key from `/v1/models`; there is no curated fallback list. It needs no
+  bridge of its own: the `cheaperinference` entry on `Model\Client\BridgeRegistry` points the
+  `symfony/ai-generic-platform` factory at the gateway's default `/v1` chat and embeddings paths.
+
 ## [1.1.0] - 2026-10-27
 
 ### Added

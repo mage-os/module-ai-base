@@ -29,6 +29,7 @@ final class RegisteredProvidersTest extends TestCase
     private const BUNDLED_PROVIDERS = [
         'anthropic',
         'azure',
+        'cheaperinference',
         'deepseek',
         'google',
         'huggingface',

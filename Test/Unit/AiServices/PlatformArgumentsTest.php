@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MageOS\AiBase\Test\Unit\AiServices;
 
 use MageOS\AiBase\AiServices\Azure;
+use MageOS\AiBase\AiServices\CheaperInference;
 use MageOS\AiBase\AiServices\Deepseek;
 use MageOS\AiBase\AiServices\Opper;
 use MageOS\AiBase\Api\Data\FieldDescriptorInterfaceFactory;
@@ -51,6 +52,22 @@ final class PlatformArgumentsTest extends TestCase
 
         self::assertSame([
             'https://api.opper.ai',
+            '',
+        ], $provider->getPlatformArguments(['api_key' => ['oops'], 'base_url' => 'https://other.example']));
+    }
+
+    /**
+     * Cheaper Inference keeps the positional-only contract and never casts malformed credentials to strings.
+     */
+    public function test_cheaper_inference_uses_a_fixed_host_even_with_malformed_configuration(): void
+    {
+        $provider = new CheaperInference(
+            $this->createMock(FieldDescriptorInterfaceFactory::class),
+            $this->createMock(JsonFetcherInterface::class),
+        );
+
+        self::assertSame([
+            'https://api.cheaperinference.com',
             '',
         ], $provider->getPlatformArguments(['api_key' => ['oops'], 'base_url' => 'https://other.example']));
     }

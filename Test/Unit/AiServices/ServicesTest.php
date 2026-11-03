@@ -80,6 +80,7 @@ final class ServicesTest extends TestCase
         return [
             'Anthropic'  => [\MageOS\AiBase\AiServices\Anthropic::class],
             'Azure'      => [\MageOS\AiBase\AiServices\Azure::class],
+            'CheaperInference' => [\MageOS\AiBase\AiServices\CheaperInference::class],
             'Deepseek'   => [\MageOS\AiBase\AiServices\Deepseek::class],
             'Google'     => [\MageOS\AiBase\AiServices\Google::class],
             'HuggingFace'=> [\MageOS\AiBase\AiServices\HuggingFace::class],
