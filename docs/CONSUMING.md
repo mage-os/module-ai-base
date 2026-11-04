@@ -37,7 +37,7 @@ release.
 |---|---|
 | `Api\*` and `Api\Data\*` interfaces | Safe to call and to type-hint against. Methods may be added in a minor release, so don't implement them yourself; write a plugin to change behavior. A store that replaces the whole client stack with a `<preference>` on `AiClientFactoryInterface` takes on adding those methods. |
 | `Api\Data\AiServiceConfigurationInterface` | Safe to implement, by extending `AiServices\AbstractAiService`, which gets a default for every method added in a minor release. |
-| Capability interfaces (`Api\ModelListProviderInterface`, `Api\PlatformArgumentsProviderInterface`) | Safe to implement. They don't change; a new capability gets a new interface. |
+| Capability interfaces (`Api\ModelListProviderInterface`, `Api\ModelGuideProviderInterface`, `Api\PlatformArgumentsProviderInterface`) | Safe to implement. They don't change; a new capability gets a new interface. |
 | The `bridges` argument of `Model\Client\BridgeRegistry` and the `dialects` argument of `Model\Client\OptionNormalizer` in di.xml | The keys documented in [PROVIDERS.md](PROVIDERS.md) don't change; new optional keys may be added. |
 | `Exceptions\*` | Safe to catch. New subclasses may be added in a minor release, always below an existing one, so an existing `catch` keeps catching them. |
 | Enums in `Api\Data` | Cases may be added in a minor release. Give a `match` over one a `default` arm. |

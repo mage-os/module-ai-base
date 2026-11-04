@@ -267,6 +267,7 @@ final class ServicesScriptDataTest extends TestCase
         $block = $reflection->newInstanceWithoutConstructor();
         $reflection->getProperty('serviceRegistry')->setValue($block, new ServiceRegistry($services));
         $reflection->getProperty('modelListResolver')->setValue($block, $this->modelListResolver);
+        $reflection->getProperty('modelOptions')->setValue($block, new \MageOS\AiBase\Model\ModelList\ModelOptions());
         $reflection->getProperty('scopeResolver')->setValue(
             $block,
             $scope === null ? FixedConfigScopeResolver::atDefault() : new FixedConfigScopeResolver($scope)

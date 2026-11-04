@@ -196,6 +196,12 @@ $_isReadOnly = $block->isReadOnly();
     $refreshLabelJs = $escaper->escapeJs(__('Refresh Models'));
     $refreshingLabelJs = $escaper->escapeJs(__('Refreshing...'));
     $modelsLabelJs = $escaper->escapeJs(__('models'));
+    // Providers that give model guidance get tier cards above the model list. %1 in "Uses %1" is
+    // the selected model's label, filled in by the script.
+    $recommendedLabelJs = $escaper->escapeJs(__('Recommended'));
+    $usesModelLabelJs = $escaper->escapeJs(__('Uses %1'));
+    $chooseModelLabelJs = $escaper->escapeJs(__('Choose a specific model'));
+    $hideModelListLabelJs = $escaper->escapeJs(__('Hide the model list'));
     // Every value placed in the script goes through encodeForScript() or escapeJs(). A stored value
     // or a provider's model name containing "<!--<script>" otherwise switched the HTML parser into a
     // state where it swallowed the closing tag, so the script never ran and no row rendered.
@@ -257,9 +263,42 @@ require(['prototype'], function () {
     function buildOptions(options, selectedValue) {
         return options.map(function (opt) {
             const selected = (selectedValue !== undefined && selectedValue === opt.value) ? ' selected' : '';
-            return '<option value="' + escapeHtml(opt.value) + '"' + selected + '>'
+            const tier = opt.tier ? ' data-tier="' + escapeHtml(opt.tier) + '"' : '';
+            return '<option value="' + escapeHtml(opt.value) + '"' + selected + tier + '>'
                 + escapeHtml(opt.label) + '</option>';
         }).join('');
+    }
+
+    /**
+     * The tier cards above the model field, for providers that give guidance.
+     *
+     * The cards are radio buttons so the keyboard works as it does in any radio group, but they are
+     * bound to a form that does not exist, so they never post: the model field stays the one control
+     * that carries the row's value, and a card only sets it.
+     */
+    function buildTierPicker(cards, label) {
+        const group = 'ai-tier-' + (++fieldSequence);
+        const cardsHtml = cards.map(function (card) {
+            const badge = card.recommended
+                ? '<span class="ai-tier-card-badge">{$recommendedLabelJs}</span>'
+                : '';
+            return '<label class="ai-tier-card">'
+                + '<input type="radio" class="ai-tier-card-input" name="' + group + '"'
+                + ' form="' + group + '-detached" value="' + escapeHtml(card.tier) + '"'
+                + ' data-model="' + escapeHtml(card.model) + '"'
+                + ' data-model-label="' + escapeHtml(card.modelLabel) + '"' + disabledAttr + '/>'
+                + '<span class="ai-tier-card-title">' + escapeHtml(card.title) + badge + '</span>'
+                + '<span class="ai-tier-card-description">' + escapeHtml(card.description) + '</span>'
+                + '</label>';
+        }).join('');
+
+        return '<div class="ai-model-picker" data-model-picker>'
+            + '<div class="ai-tier-cards" role="radiogroup" aria-label="' + escapeHtml(label) + '">'
+            + cardsHtml + '</div>'
+            + '<p class="note ai-model-summary"><span data-model-summary></span>'
+            + '<button type="button" class="ai-model-advanced-toggle" aria-expanded="false"'
+            + ' data-model-advanced-toggle>{$chooseModelLabelJs}</button></p>'
+            + '</div>';
     }
 
     /**
@@ -385,9 +424,16 @@ require(['prototype'], function () {
                     + '</button>'
                 : '';
 
+            // A provider that gives guidance is picked by tier: its cards lead, and the full model list
+            // waits behind "Choose a specific model". syncRowModel() keeps the two in step.
+            const tierCards = field.name === 'model' ? (serviceSchema.tierCards || []) : [];
+            const picker = tierCards.length ? buildTierPicker(tierCards, field.label) : '';
+            const advancedAttr = picker ? ' data-model-advanced hidden' : '';
+
             return '<tr>'
                 + '<th><label for="' + control.id + '">' + escapeHtml(field.label) + '</label></th>'
-                + '<td><div class="ai-field-control">' + control.html + refresh + '</div></td>'
+                + '<td>' + picker
+                + '<div class="ai-field-control"' + advancedAttr + '>' + control.html + refresh + '</div></td>'
                 + '</tr>';
         }).join('');
 
@@ -547,10 +593,11 @@ require(['prototype'], function () {
     function syncRowModel(rowId, serviceCode) {
         const label = findRowModelLabel(rowId);
         const field = findField(rowId, serviceCode, 'model');
-        if (!label) return;
-        label.textContent = (field && field.value) ? field.value : '';
+        if (field) syncModelPicker(field);
+        if (label) label.textContent = (field && field.value) ? field.value : '';
         if (field && !field.dataset.modelSynced) {
             field.dataset.modelSynced = '1';
+            bindModelPicker(field);
             field.addEventListener('change', function () { syncRowModel(rowId, serviceCode); });
             field.addEventListener('input', function () { syncRowModel(rowId, serviceCode); });
         }
@@ -741,12 +788,115 @@ require(['prototype'], function () {
             });
     }
 
-    function updateModelOptions(rowId, serviceCode, models) {
+    /**
+     * The options a model field picks from: a select's own, or a free-text field's suggestions.
+     */
+    function modelOptionsOf(field) {
+        if (field.tagName === 'SELECT') return Array.from(field.options);
+        return field.list ? Array.from(field.list.options) : [];
+    }
+
+    function findModelPicker(field) {
+        const cell = field.closest('td');
+        return cell ? cell.querySelector('[data-model-picker]') : null;
+    }
+
+    /**
+     * Light up the card of the tier the selected model belongs to, and say which model that is.
+     *
+     * A model the provider gave no tier for (a legacy value, or one typed by hand) lights no card,
+     * so the list opens to show what is actually selected instead of leaving the row looking empty.
+     */
+    function syncModelPicker(field) {
+        const picker = findModelPicker(field);
+        if (!picker) return;
+
+        const match = modelOptionsOf(field).find(function (opt) { return opt.value === field.value; });
+        const tier = (match && match.dataset.tier) ? match.dataset.tier : '';
+        picker.querySelectorAll('.ai-tier-card-input').forEach(function (radio) {
+            radio.checked = tier !== '' && radio.value === tier;
+            radio.closest('.ai-tier-card').classList.toggle('is-selected', radio.checked);
+        });
+
+        const summary = picker.querySelector('[data-model-summary]');
+        const label = match ? match.text : field.value;
+        // A replacer function, so a "$&" in a model label is taken literally rather than as a pattern.
+        summary.textContent = field.value ? '{$usesModelLabelJs}'.replace('%1', function () { return label; }) : '';
+
+        if (field.value && tier === '') setModelListOpen(field, true);
+    }
+
+    function setModelListOpen(field, isOpen) {
+        const cell = field.closest('td');
+        const list = cell ? cell.querySelector('[data-model-advanced]') : null;
+        const toggle = cell ? cell.querySelector('[data-model-advanced-toggle]') : null;
+        if (!list || !toggle) return;
+
+        list.hidden = !isOpen;
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        toggle.textContent = isOpen ? '{$hideModelListLabelJs}' : '{$chooseModelLabelJs}';
+    }
+
+    /**
+     * Set the model field to a card's model. A refreshed list may not contain that exact model, so
+     * it is added as an option first; a select would otherwise silently refuse the value.
+     */
+    function applyTierCard(field, radio) {
+        const model = radio.dataset.model;
+        const known = modelOptionsOf(field).some(function (opt) { return opt.value === model; });
+        const target = field.tagName === 'SELECT' ? field : field.list;
+        if (!known && target) {
+            const opt = document.createElement('option');
+            opt.value = model;
+            opt.text = radio.dataset.modelLabel;
+            opt.dataset.tier = radio.value;
+            target.appendChild(opt);
+        }
+
+        field.value = model;
+        field.dispatchEvent(new Event('change'));
+    }
+
+    function bindModelPicker(field) {
+        const picker = findModelPicker(field);
+        if (!picker) return;
+
+        picker.querySelectorAll('.ai-tier-card-input').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                if (radio.checked) applyTierCard(field, radio);
+            });
+        });
+        const toggle = picker.querySelector('[data-model-advanced-toggle]');
+        toggle.addEventListener('click', function () {
+            setModelListOpen(field, toggle.getAttribute('aria-expanded') !== 'true');
+        });
+    }
+
+    /**
+     * Option elements for a refreshed list. The response's `options` carry each model's tier;
+     * `models` is the plain map, used when talking to a server from before it had them.
+     */
+    function buildOptionElements(models, options) {
+        const rows = Array.isArray(options)
+            ? options
+            : Object.keys(models).map(function (value) { return { value: value, label: models[value] }; });
+
+        return rows.map(function (row) {
+            const opt = document.createElement('option');
+            opt.value = row.value;
+            opt.text = row.label;
+            if (row.tier) opt.dataset.tier = row.tier;
+            return opt;
+        });
+    }
+
+    function updateModelOptions(rowId, serviceCode, models, options) {
         const el = findField(rowId, serviceCode, 'model');
         if (!el) return;
 
         if (el.tagName !== 'SELECT') {
-            updateModelDatalist(el, models);
+            updateModelDatalist(el, buildOptionElements(models, options));
+            syncRowModel(rowId, serviceCode);
             return;
         }
 
@@ -754,10 +904,7 @@ require(['prototype'], function () {
         while (el.options.length) {
             el.remove(0);
         }
-        Object.keys(models).forEach(function (value) {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.text = models[value];
+        buildOptionElements(models, options).forEach(function (opt) {
             el.appendChild(opt);
         });
         if (current !== '') {
@@ -772,6 +919,7 @@ require(['prototype'], function () {
             }
             el.value = current;
         }
+        syncRowModel(rowId, serviceCode);
     }
 
     /**
@@ -779,7 +927,7 @@ require(['prototype'], function () {
      * the list is a suggestion, not a constraint, which is the point for providers
      * whose catalogue cannot be known ahead of time.
      */
-    function updateModelDatalist(input, models) {
+    function updateModelDatalist(input, optionElements) {
         let list = input.list;
         if (!list) {
             list = document.createElement('datalist');
@@ -791,10 +939,7 @@ require(['prototype'], function () {
         while (list.firstChild) {
             list.removeChild(list.firstChild);
         }
-        Object.keys(models).forEach(function (value) {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.text = models[value];
+        optionElements.forEach(function (opt) {
             list.appendChild(opt);
         });
     }
@@ -816,7 +961,7 @@ require(['prototype'], function () {
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 if (data.success) {
-                    updateModelOptions(button.dataset.rowId, button.dataset.serviceCode, data.models);
+                    updateModelOptions(button.dataset.rowId, button.dataset.serviceCode, data.models, data.options);
                     resultEl.classList.add('ai-test-result-success');
                     resultEl.textContent = data.count + ' {$modelsLabelJs}';
                 } else {

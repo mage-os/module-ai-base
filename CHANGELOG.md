@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Pick a model by tier**: for providers that give guidance, the model field leads with three
+  cards, Fast, Balanced and Most capable, each with a one-line description in the same words for
+  every provider, and the recommended one marked. The full model list stays available under
+  "Choose a specific model", and a new row starts on the recommended model instead of the first in
+  the list. Providers opt in through the new `Api\ModelGuideProviderInterface` capability, which
+  names a model per tier and classifies one model id at a time, so models added through **Refresh
+  Models** light the right card too. Anthropic is the first provider to implement it: Claude Haiku
+  5.5, Sonnet 5.5 (recommended) and Opus 5.5. Providers without guidance keep the plain model
+  field. No prices or cost hints, in line with the "No cost estimation" decision.
 - **Current Claude models in the Anthropic defaults**: Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and
   Haiku 5.5 are now in the curated model list, so they can be picked without a **Refresh Models**
   first.

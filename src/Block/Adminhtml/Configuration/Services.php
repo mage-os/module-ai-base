@@ -19,6 +19,7 @@ use MageOS\AiBase\Model\AiServiceSelector;
 use MageOS\AiBase\Model\Client\BridgeRegistry;
 use MageOS\AiBase\Model\Config\ConfigScope;
 use MageOS\AiBase\Model\Config\ConfigScopeResolver;
+use MageOS\AiBase\Model\ModelList\ModelOptions;
 use MageOS\AiBase\Model\ModelList\Resolver;
 use MageOS\AiBase\Model\ServiceRegistry;
 
@@ -56,6 +57,7 @@ class Services extends AbstractFieldArray
      * @param SettingChecker $settingChecker The check Magento's save path uses to skip a field set
      *        in deployment configuration
      * @param ConfigScopeResolver $scopeResolver Turns the rendered field's scope id into a code
+     * @param ModelOptions $modelOptions Builds the model options, with the provider's guidance
      * @param array<string,mixed> $data
      * @param SecureHtmlRenderer|null $secureRenderer
      */
@@ -66,6 +68,7 @@ class Services extends AbstractFieldArray
         private readonly BridgeRegistry $bridgeRegistry,
         private readonly SettingChecker $settingChecker,
         private readonly ConfigScopeResolver $scopeResolver,
+        private readonly ModelOptions $modelOptions,
         array $data = [],
         ?SecureHtmlRenderer $secureRenderer = null,
     ) {
@@ -178,7 +181,7 @@ class Services extends AbstractFieldArray
      * is the administrator's own name for the row, which is the one thing besides the code that
      * says what the placeholder used to be.
      *
-     * @return list<array{code:string,id:string,label:string,registered:bool,values:array<array-key,mixed>,modelOptions:list<array{value:string,label:string}>|null}>
+     * @return list<array{code:string,id:string,label:string,registered:bool,values:array<array-key,mixed>,modelOptions:list<array{value:string,label:string,tier?:string}>|null}>
      */
     public function getStoredRows(): array
     {
@@ -334,7 +337,7 @@ class Services extends AbstractFieldArray
      * added row starts with; a stored row gets its own list through {@see getStoredRows()}.
      *
      * @return string JSON object keyed by service code:
-     *         {name: string, fields: array[], supportsModelRefresh: bool}
+     *         {name: string, fields: array[], supportsModelRefresh: bool, tierCards: array[]}
      */
     public function getServicesSchemaJson(): string
     {
@@ -351,13 +354,16 @@ class Services extends AbstractFieldArray
                         'name'      => $field->getName(),
                         'label'     => $field->getLabel(),
                         'type'      => $field->getType(),
-                        'options'   => $this->resolveFieldOptions($field, $models),
-                        'default'   => $field->getDefault(),
+                        'options'   => $this->resolveFieldOptions($service, $field, $models),
+                        'default'   => $this->resolveFieldDefault($service, $field),
                         'encrypted' => $field->isEncrypted(),
                     ],
                     $service->getConfigurationFields(),
                 ),
                 'supportsModelRefresh' => $service instanceof ModelListProviderInterface,
+                // One card per tier above the model list, for providers that give guidance. Empty
+                // means the row keeps the plain model field.
+                'tierCards' => $this->modelOptions->buildTierCards($service),
             ];
         }
         return $this->encodeForScript($schema);
@@ -371,13 +377,41 @@ class Services extends AbstractFieldArray
      * cannot be known ahead of time (self-hosted Ollama and LM Studio, or OpenRouter's very
      * large catalogue) still benefit from a refresh instead of silently discarding it.
      *
+     * @param AiServiceConfigurationInterface $service
      * @param FieldDescriptorInterface $field
      * @param array<string,string> $models Resolved model list (stored or curated) as value => label
-     * @return array<int,array{value:string,label:string}>
+     * @return array<int,array{value:string,label:string,tier?:string}>
      */
-    private function resolveFieldOptions(FieldDescriptorInterface $field, array $models): array
-    {
-        return $field->getName() === self::FIELD_MODEL ? $this->toOptions($models) : $field->getOptions();
+    private function resolveFieldOptions(
+        AiServiceConfigurationInterface $service,
+        FieldDescriptorInterface $field,
+        array $models
+    ): array {
+        return $field->getName() === self::FIELD_MODEL
+            ? $this->modelOptions->build($service, $models)
+            : $field->getOptions();
+    }
+
+    /**
+     * The value a new row's field starts with.
+     *
+     * A model select without a default falls back to its first option, which for a guided provider
+     * is the most capable model at the top of the list rather than the one it recommends. An
+     * administrator who saves without looking would get the slowest model by accident.
+     *
+     * @param AiServiceConfigurationInterface $service
+     * @param FieldDescriptorInterface $field
+     * @return string|null
+     */
+    private function resolveFieldDefault(
+        AiServiceConfigurationInterface $service,
+        FieldDescriptorInterface $field
+    ): ?string {
+        if ($field->getName() !== self::FIELD_MODEL || $field->getDefault() !== null) {
+            return $field->getDefault();
+        }
+
+        return $this->modelOptions->getDefaultModel($service);
     }
 
     /**
@@ -386,7 +420,7 @@ class Services extends AbstractFieldArray
      * @param string $code
      * @param string $rowId
      * @param ConfigScope $scope
-     * @return list<array{value:string,label:string}>|null
+     * @return list<array{value:string,label:string,tier?:string}>|null
      */
     private function getRowModelOptions(string $code, string $rowId, ConfigScope $scope): ?array
     {
@@ -395,21 +429,9 @@ class Services extends AbstractFieldArray
             return null;
         }
 
-        return $this->toOptions($this->modelListResolver->getModelsForRow($service, $rowId, $scope));
-    }
-
-    /**
-     * Turn a value => label model map into the option rows the script renders.
-     *
-     * @param array<string,string> $models
-     * @return list<array{value:string,label:string}>
-     */
-    private function toOptions(array $models): array
-    {
-        return array_map(
-            static fn (string|int $value, string $label): array => ['value' => (string) $value, 'label' => $label],
-            array_keys($models),
-            array_values($models),
+        return $this->modelOptions->build(
+            $service,
+            $this->modelListResolver->getModelsForRow($service, $rowId, $scope)
         );
     }
 

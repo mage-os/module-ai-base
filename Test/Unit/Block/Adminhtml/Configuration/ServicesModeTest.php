@@ -132,6 +132,7 @@ final class ServicesModeTest extends TestCase
             $this->serviceFor('missing'),
         ]));
         $reflection->getProperty('modelListResolver')->setValue($block, $this->modelListResolver);
+        $reflection->getProperty('modelOptions')->setValue($block, new \MageOS\AiBase\Model\ModelList\ModelOptions());
         $reflection->getProperty('bridgeRegistry')->setValue($block, new BridgeRegistry([
             'installed' => ['factory' => InstalledModeBridgeFactory::class, 'package' => 'symfony/ai-installed-platform'],
             'missing' => ['factory' => 'Absent\\Bridge\\Factory', 'package' => 'symfony/ai-missing-platform'],

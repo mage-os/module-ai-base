@@ -6,23 +6,28 @@ namespace MageOS\AiBase\Test\Unit\Controller\Adminhtml\Service;
 
 require_once __DIR__ . '/../../../Stubs/RecordingLogger.php';
 require_once __DIR__ . '/../../../Stubs/FixedConfigScopeResolver.php';
+require_once __DIR__ . '/../../../Stubs/FakeFieldDescriptorFactory.php';
 
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Exception\LocalizedException;
+use MageOS\AiBase\AiServices\Anthropic;
 use MageOS\AiBase\AiServices\OpenAi;
 use MageOS\AiBase\Api\AiServiceSelectorInterface;
 use MageOS\AiBase\Api\Data\AiServiceConfigurationInterface;
 use MageOS\AiBase\Api\Data\AiServiceInterface;
+use MageOS\AiBase\Api\JsonFetcherInterface;
 use MageOS\AiBase\Controller\Adminhtml\Service\RefreshModels;
 use MageOS\AiBase\Model\Config\ConfigScope;
 use MageOS\AiBase\Model\Config\ConfigScopeResolver;
 use MageOS\AiBase\Model\FailureReporter;
+use MageOS\AiBase\Model\ModelList\ModelOptions;
 use MageOS\AiBase\Model\ModelList\Storage;
 use MageOS\AiBase\Model\ServiceRegistry;
 use MageOS\AiBase\Model\ServiceScope;
+use MageOS\AiBase\Test\Unit\Stubs\FakeFieldDescriptorFactory;
 use MageOS\AiBase\Test\Unit\Stubs\FixedConfigScopeResolver;
 use MageOS\AiBase\Test\Unit\Stubs\RecordingLogger;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -94,6 +99,7 @@ final class RefreshModelsTest extends TestCase
             new FailureReporter($this->logger),
             $scopeResolver ?? FixedConfigScopeResolver::atDefault(),
             $this->serviceScope,
+            new ModelOptions(),
         );
     }
 
@@ -169,6 +175,33 @@ final class RefreshModelsTest extends TestCase
         self::assertTrue($this->resultData['success']);
         self::assertSame(2, $this->resultData['count']);
         self::assertSame($models, $this->resultData['models']);
+    }
+
+    public function test_execute_returns_the_refreshed_options_with_the_providers_guidance(): void
+    {
+        $this->stubParams(['service_code' => 'anthropic']);
+        $configured = $this->createMock(AiServiceInterface::class);
+        $configured->method('getCode')->willReturn('anthropic');
+        $configured->method('getId')->willReturn('_anthropic_row');
+        $configured->method('getConfiguration')->willReturn(['api_key' => 'sk-ant-test']);
+        $this->serviceSelector->method('getByCode')->with('anthropic')->willReturn([$configured]);
+        $anthropic = new Anthropic(new FakeFieldDescriptorFactory(), new class implements JsonFetcherInterface {
+            public function getJson(string $url, #[\SensitiveParameter] array $headers = []): array
+            {
+                return ['data' => [['id' => 'claude-sonnet-5-5', 'display_name' => 'Claude Sonnet 5.5']]];
+            }
+        });
+
+        $this->createSubject([$anthropic])->execute();
+
+        self::assertSame(
+            [[
+                'value' => 'claude-sonnet-5-5',
+                'label' => 'Claude Sonnet 5.5 (recommended)',
+                'tier' => 'balanced',
+            ]],
+            $this->resultData['options']
+        );
     }
 
     public function test_execute_passes_localized_exception_message_through(): void

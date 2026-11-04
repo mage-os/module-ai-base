@@ -15,6 +15,7 @@ use MageOS\AiBase\Api\ModelListProviderInterface;
 use MageOS\AiBase\Model\Config\ConfigScope;
 use MageOS\AiBase\Model\Config\ConfigScopeResolver;
 use MageOS\AiBase\Model\FailureReporter;
+use MageOS\AiBase\Model\ModelList\ModelOptions;
 use MageOS\AiBase\Model\ModelList\Storage;
 use MageOS\AiBase\Model\ServiceRegistry;
 use MageOS\AiBase\Model\ServiceScope;
@@ -46,6 +47,8 @@ class RefreshModels extends Action implements HttpPostActionInterface
      * @param FailureReporter $failureReporter Logs a failure in full and decides what the page shows
      * @param ConfigScopeResolver $scopeResolver Reads the scope the config page sent along
      * @param ServiceScope $serviceScope Makes the selector read the rows of that scope
+     * @param ModelOptions $modelOptions Builds the refreshed options with the provider's guidance, so a
+     *        refresh keeps the labels the page rendered
      */
     public function __construct(
         Context $context,
@@ -56,6 +59,7 @@ class RefreshModels extends Action implements HttpPostActionInterface
         private readonly FailureReporter $failureReporter,
         private readonly ConfigScopeResolver $scopeResolver,
         private readonly ServiceScope $serviceScope,
+        private readonly ModelOptions $modelOptions,
     ) {
         parent::__construct($context);
     }
@@ -121,6 +125,7 @@ class RefreshModels extends Action implements HttpPostActionInterface
                 'success' => true,
                 'count' => count($models),
                 'models' => $models,
+                'options' => $this->modelOptions->build($definition, $models),
             ]);
         } catch (\Throwable $e) {
             return $result->setData([

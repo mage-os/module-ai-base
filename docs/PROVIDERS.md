@@ -15,6 +15,7 @@ The module separates three concerns, each with its own contract:
 | `Api\AiServiceSelectorInterface` | Consumer API for reading configured instances (`getAll()`, `getByCode()`) |
 | `Api\AiClientInterface` / `Api\AiClientFactoryInterface` | Provider-agnostic client for actually making AI calls |
 | `Api\ModelListProviderInterface` | Optional: live-fetch the provider's model list (admin-triggered only) |
+| `Api\ModelGuideProviderInterface` | Optional: let admins pick a model by tier (Fast, Balanced, Most capable), with a recommended one |
 | `Api\PlatformArgumentsProviderInterface` | Optional: the arguments the provider's Symfony AI bridge factory takes, when that isn't the API key alone |
 
 Configuration is stored as JSON in `core_config_data` at `mageos_ai/services/configuration`,
@@ -344,6 +345,37 @@ own lists, and take precedence over `getSupportedModels()` via `Model\ModelList\
 is the single merge point (service classes stay pure). Lists stored per code by earlier versions
 (`mageos_ai/services/models/<code>`) are still read as a fallback. The curated list remains the fallback for
 stores that never refresh.
+
+### 6. Model guidance (optional)
+
+Implement `Api\ModelGuideProviderInterface` to let an administrator pick by tier instead of by
+model name:
+
+```php
+public function getModelGuidance(string $model): ?ModelGuidanceInterface
+public function getTierModel(ModelTier $tier): ?string
+```
+
+The admin form then shows one card per tier (`Fast`, `Balanced`, `Most capable`), each with the
+same one-line description for every provider, and the full model list folded away behind "Choose
+a specific model". Picking a card sets the row's model to `getTierModel()` for that tier; the
+row still posts a single `model` value, so nothing downstream changes. A tier you return `null`
+for gets no card.
+
+`getModelGuidance()` says which tier a model belongs to and whether it is the recommended one,
+or `null` for a model you don't know. It lights up the matching card when a specific model is
+picked from the list, adds "(recommended)" to that model's label, and the recommended tier model
+is what a new row starts on. A model you return `null` for lights no card, and the list opens to
+show it: an unlabelled model beats a wrongly labelled one.
+
+It takes one model id at a time, so classify by family rather than by a fixed list: a model that
+only arrives through Refresh Models then lights the right card too. The bundled `Anthropic`
+provider maps `haiku`, `sonnet`, `opus` and `fable` to their tiers. Create the guidance through the
+generated `Api\Data\ModelGuidanceInterfaceFactory`; don't implement `ModelGuidanceInterface`
+yourself, so it can gain methods in a minor release.
+
+Guidance is about picking, not paying: there is no price or cost tier, for the reasons under "No
+cost estimation" in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Customization recipes
 
