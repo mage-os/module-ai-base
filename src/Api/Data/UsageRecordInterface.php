@@ -145,6 +145,33 @@ interface UsageRecordInterface
     public function getReasoningTokens(): ?int;
 
     /**
+     * Estimated cost of the call in {@see getCostCurrency()}, fixed when the row was written.
+     *
+     * Null means unknown, never free: the model had no price, the provider reported no usage, or a
+     * rate the call needed was missing. It is an estimate from public list prices, so batch
+     * discounts, negotiated rates and gateway markups are not in it.
+     *
+     * @return float|null
+     */
+    public function getCost(): ?float;
+
+    /**
+     * ISO currency of {@see getCost()}; null exactly when the cost is null.
+     *
+     * @return string|null
+     */
+    public function getCostCurrency(): ?string;
+
+    /**
+     * Version of the price table the cost was computed from, or `override` for a manual price.
+     *
+     * Stored so a figure can be traced, and so a later price change visibly does not rewrite it.
+     *
+     * @return string|null
+     */
+    public function getPriceSnapshot(): ?string;
+
+    /**
      * Whether the call was served over a streaming response.
      *
      * @return bool

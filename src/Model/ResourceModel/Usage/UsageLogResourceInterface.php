@@ -70,7 +70,7 @@ interface UsageLogResourceInterface
      * @param \DateTimeInterface $to
      * @param string|null $consumer
      * @param int|null $storeId Narrow to one store, or `null` for every store
-     * @return array<string,int|null>
+     * @return array<string,int|string|null>
      */
     public function sumRange(
         \DateTimeInterface $from,

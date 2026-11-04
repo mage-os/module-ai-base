@@ -12,6 +12,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use MageOS\AiBase\Api\Data\Granularity;
 use MageOS\AiBase\Api\Data\Period;
 use MageOS\AiBase\Api\Data\UsageBreakdownInterface;
+use MageOS\AiBase\Model\Pricing\CostFormatter;
 use MageOS\AiBase\Api\AiServiceSelectorInterface;
 use MageOS\AiBase\Api\Data\AiServiceInterface;
 use MageOS\AiBase\Block\Adminhtml\Usage\Dashboard;
@@ -668,6 +669,7 @@ final class DashboardTest extends TestCase
         );
         $reflection->getProperty('storeManager')->setValue($block, $this->storeManager);
         $reflection->getProperty('now')->setValue($block, $now);
+        $reflection->getProperty('costFormatter')->setValue($block, new CostFormatter());
         $reflection->getProperty('_request')->setValue($block, $request);
 
         return $block;

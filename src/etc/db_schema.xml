@@ -26,6 +26,12 @@
                 comment="Prompt tokens written to cache, when the provider reports cache writes separately"/>
         <column xsi:type="int" name="reasoning_tokens" unsigned="true" nullable="true"
                 comment="Reasoning portion of the completion tokens, when the provider reports thinking tokens separately"/>
+        <column xsi:type="decimal" name="cost" scale="10" precision="18" unsigned="true" nullable="true"
+                comment="Estimated cost of the call, computed once at write time from the price snapshot named in price_snapshot and never recalculated; null means unknown (no price, or a needed token count missing), never zero"/>
+        <column xsi:type="varchar" name="cost_currency" length="3" nullable="true"
+                comment="ISO currency of cost; null whenever cost is null"/>
+        <column xsi:type="varchar" name="price_snapshot" length="64" nullable="true"
+                comment="Version of the price table (or 'override' for a manual override) the cost was computed from; null whenever cost is null"/>
         <column xsi:type="boolean" name="streamed" nullable="false" default="false"
                 comment="Whether the call was served over a streaming response"/>
         <column xsi:type="boolean" name="failed" nullable="false" default="false"
@@ -73,6 +79,14 @@
                 comment="Reasoning portion of the completion tokens, when the provider reports thinking tokens separately"/>
         <column xsi:type="int" name="failed_calls" unsigned="true" nullable="false" default="0"
                 comment="Number of calls rolled into this row that threw after being sent to the provider"/>
+        <column xsi:type="decimal" name="cost" scale="10" precision="18" unsigned="true" nullable="true"
+                comment="Sum of the known per-call estimated costs rolled into this row; null when no call had a known cost, never zero for unknown"/>
+        <column xsi:type="int" name="priced_calls" unsigned="true" nullable="false" default="0"
+                comment="Number of calls rolled into this row that had a known cost; fewer than calls means cost is a partial sum"/>
+        <column xsi:type="varchar" name="cost_currency" length="3" nullable="true"
+                comment="ISO currency of cost; null when cost is null"/>
+        <column xsi:type="varchar" name="price_snapshot" length="64" nullable="true"
+                comment="Price snapshot version the rolled-up costs were computed from, or 'mixed' when the day spans several"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="entity_id"/>
         </constraint>

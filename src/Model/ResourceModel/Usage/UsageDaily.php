@@ -97,6 +97,10 @@ class UsageDaily extends AbstractDb implements UsageDailyResourceInterface
         'cache_read_tokens',
         'cache_write_tokens',
         'reasoning_tokens',
+        'cost',
+        'priced_calls',
+        'cost_currency',
+        'price_snapshot',
     ];
 
     /**
@@ -334,6 +338,8 @@ class UsageDaily extends AbstractDb implements UsageDailyResourceInterface
             'cache_read_tokens' => new \Zend_Db_Expr('SUM(cache_read_tokens)'),
             'cache_write_tokens' => new \Zend_Db_Expr('SUM(cache_write_tokens)'),
             'reasoning_tokens' => new \Zend_Db_Expr('SUM(reasoning_tokens)'),
+            'cost' => new \Zend_Db_Expr('SUM(cost)'),
+            'priced_calls' => new \Zend_Db_Expr('COALESCE(SUM(priced_calls), 0)'),
         ];
     }
 
