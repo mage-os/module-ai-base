@@ -17,6 +17,8 @@ class FieldDescriptor implements FieldDescriptorInterface
      * @param bool $encrypted
      * @param bool $endpoint Whether the field names the host credentials are sent to; defaults to
      *        false so a `create([...])` call written before the flag existed keeps working
+     * @param string|null $placeholder
+     * @param bool $advanced Whether the form collapses the field under "Advanced"
      */
     public function __construct(
         private readonly string $name,
@@ -26,6 +28,8 @@ class FieldDescriptor implements FieldDescriptorInterface
         private readonly ?string $default = null,
         private readonly bool $encrypted = false,
         private readonly bool $endpoint = false,
+        private readonly ?string $placeholder = null,
+        private readonly bool $advanced = false,
     ) {
     }
 
@@ -83,5 +87,21 @@ class FieldDescriptor implements FieldDescriptorInterface
     public function isEndpoint(): bool
     {
         return $this->endpoint;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getPlaceholder(): ?string
+    {
+        return $this->placeholder;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function isAdvanced(): bool
+    {
+        return $this->advanced;
     }
 }

@@ -35,13 +35,26 @@ class ClientFactory implements AiClientFactoryInterface
      * that asks. A parameter the provider already fills positionally through
      * {@see PlatformArgumentsProviderInterface} is never named a second time: LM Studio's first
      * parameter is itself spelled `baseUrl`, and naming it again is a fatal "Named parameter
-     * $baseUrl overwrites previous argument".
+     * $baseUrl overwrites previous argument". `completions_path` and `embeddings_path` let an
+     * OpenAI-compatible row point the generic bridge at a gateway that serves those routes
+     * somewhere other than /v1.
      */
     private const ROW_ARGUMENTS = [
-        'base_url' => 'baseUrl',
-        'username' => 'username',
-        'agent'    => 'agent',
+        'base_url'         => 'baseUrl',
+        'username'         => 'username',
+        'agent'            => 'agent',
+        'completions_path' => 'completionsPath',
+        'embeddings_path'  => 'embeddingsPath',
     ];
+
+    /**
+     * Bridge parameters holding a path the bridge appends to the base URL.
+     *
+     * Each is given exactly one leading slash. Without it the path is glued straight onto the host,
+     * and a value such as `@other.example/v1` would turn the base URL's host into credentials and
+     * send the request, key included, to a different host.
+     */
+    private const PATH_ARGUMENTS = ['completionsPath', 'embeddingsPath'];
 
     /**
      * @param AiServiceSelectorInterface $serviceSelector
@@ -366,9 +379,7 @@ class ClientFactory implements AiClientFactoryInterface
      *
      * Each is passed only when the factory declares it *and* the row holds a non-empty value, so a
      * bridge keeps its own default for every provider whose form offers no such field, and rows
-     * saved before a field was added keep working. The base URL loses its trailing slash because
-     * bridges append their own path, and a doubled separator is a 404 that reads like an
-     * authentication failure.
+     * saved before a field was added keep working.
      *
      * @param array<string,true> $accepted Parameter names the factory declares beyond the positional ones
      * @param array<string,mixed> $config Stored service configuration
@@ -382,10 +393,30 @@ class ClientFactory implements AiClientFactoryInterface
             if ($value === '') {
                 continue;
             }
-            $arguments[$parameter] = $parameter === 'baseUrl' ? rtrim($value, '/') : $value;
+            $arguments[$parameter] = $this->normalizeRowArgument($parameter, $value);
         }
 
         return $arguments;
+    }
+
+    /**
+     * A row value in the shape its bridge parameter expects.
+     *
+     * The base URL loses its trailing slash because bridges append their own path, and a doubled
+     * separator is a 404 that reads like an authentication failure. A path gets exactly one leading
+     * slash, see {@see PATH_ARGUMENTS}.
+     *
+     * @param string $parameter Bridge parameter name
+     * @param string $value Trimmed, non-empty row value
+     * @return string
+     */
+    private function normalizeRowArgument(string $parameter, string $value): string
+    {
+        if ($parameter === 'baseUrl') {
+            return rtrim($value, '/');
+        }
+
+        return in_array($parameter, self::PATH_ARGUMENTS, true) ? '/' . ltrim($value, '/') : $value;
     }
 
     /**

@@ -70,4 +70,22 @@ interface FieldDescriptorInterface
      * @return bool
      */
     public function isEndpoint(): bool;
+
+    /**
+     * Hint shown in an empty input, if any; never stored.
+     *
+     * Unlike getDefault(), which fills the input and so ends up saved with the row, a placeholder
+     * only shows what an empty field falls back to. A row then keeps following that fallback when it
+     * changes, instead of carrying a copy of it from the day it was saved.
+     *
+     * @return string|null
+     */
+    public function getPlaceholder(): ?string;
+
+    /**
+     * Whether the field is one most administrators never need, shown collapsed under "Advanced".
+     *
+     * @return bool
+     */
+    public function isAdvanced(): bool;
 }

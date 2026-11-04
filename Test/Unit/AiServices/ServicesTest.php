@@ -29,6 +29,8 @@ final class ServicesTest extends TestCase
                 default: $data['default'] ?? null,
                 encrypted: $data['encrypted'] ?? false,
                 endpoint: $data['endpoint'] ?? false,
+                placeholder: $data['placeholder'] ?? null,
+                advanced: $data['advanced'] ?? false,
             )
         );
         $this->fieldFactory = $stub;

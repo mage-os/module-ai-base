@@ -354,6 +354,8 @@ class Services extends AbstractFieldArray
                         'options'   => $this->resolveFieldOptions($field, $models),
                         'default'   => $field->getDefault(),
                         'encrypted' => $field->isEncrypted(),
+                        'placeholder' => $field->getPlaceholder(),
+                        'advanced'  => $field->isAdvanced(),
                     ],
                     $service->getConfigurationFields(),
                 ),
