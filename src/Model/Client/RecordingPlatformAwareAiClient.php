@@ -8,6 +8,7 @@ use MageOS\AiBase\Api\AiClientInterface;
 use MageOS\AiBase\Api\PlatformAwareInterface;
 use MageOS\AiBase\Api\UsageRecordRepositoryInterface;
 use MageOS\AiBase\Model\Usage\UsageStoreResolver;
+use MageOS\AiBase\Model\Pricing\CostEstimator;
 use Psr\Log\LoggerInterface;
 use Symfony\AI\Platform\PlatformInterface;
 
@@ -34,6 +35,7 @@ class RecordingPlatformAwareAiClient extends RecordingAiClient implements Platfo
      * @param UsageRecordRepositoryInterface $repository
      * @param UsageStoreResolver $storeResolver
      * @param LoggerInterface $logger
+     * @param CostEstimator|null $costEstimator
      */
     // Not a useless override: the promoted parameter is typed as the narrower intersection
     // getPlatform() and normalizeOptions() below need, which is what keeps an intersection-typed
@@ -44,8 +46,9 @@ class RecordingPlatformAwareAiClient extends RecordingAiClient implements Platfo
         UsageRecordRepositoryInterface $repository,
         UsageStoreResolver $storeResolver,
         LoggerInterface $logger,
+        ?CostEstimator $costEstimator = null,
     ) {
-        parent::__construct($platformAwareDelegate, $repository, $storeResolver, $logger);
+        parent::__construct($platformAwareDelegate, $repository, $storeResolver, $logger, $costEstimator);
     }
 
     /**

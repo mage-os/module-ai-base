@@ -12,6 +12,7 @@ use MageOS\AiBase\Api\Data\Period;
 use MageOS\AiBase\Api\Data\UsageBreakdownInterface;
 use MageOS\AiBase\Api\Data\UsageTotalsInterface;
 use MageOS\AiBase\Api\UsageStatsInterface;
+use MageOS\AiBase\Model\Pricing\CostFormatter;
 use MageOS\AiBase\Model\Usage\Graph\DataPoint;
 use MageOS\AiBase\Model\Usage\Graph\SvgRenderer;
 use MageOS\AiBase\Model\Usage\ServiceRowLabels;
@@ -174,6 +175,7 @@ class Dashboard extends Template
      * @param \DateTimeImmutable|null $now Deterministic clock for tests, the same convention
      *        {@see Period::today()} documents; production callers leave this null and get the real
      *        current instant.
+     * @param CostFormatter $costFormatter Renders the estimated cost, `n/a` when unknown
      */
     public function __construct(
         Context $context,
@@ -185,6 +187,7 @@ class Dashboard extends Template
         private readonly \Magento\Store\Model\StoreManagerInterface $storeManager,
         array $data = [],
         private readonly ?\DateTimeImmutable $now = null,
+        private readonly CostFormatter $costFormatter = new CostFormatter(),
     ) {
         parent::__construct($context, $data);
     }
@@ -638,6 +641,30 @@ class Dashboard extends Template
     public function getFormattedCacheWriteTokens(): string
     {
         return $this->formatNullableTokenCount($this->getTotals()->getCacheWriteTokens());
+    }
+
+    /**
+     * The selected period's estimated cost, or `n/a` when no call in it could be priced.
+     *
+     * @return string
+     */
+    public function getFormattedCost(): string
+    {
+        return $this->costFormatter->formatTotals($this->getTotals());
+    }
+
+    /**
+     * What the cost figure is and is not, shown next to it every time.
+     *
+     * @return string
+     */
+    public function getCostDisclaimer(): string
+    {
+        return (string) __(
+            'Estimated from public list prices when each call was made. Batch discounts, negotiated '
+            . 'rates and gateway markups are not reflected, and calls made through getPlatform() are '
+            . 'not recorded. n/a means the cost is unknown, not free.'
+        );
     }
 
     /**

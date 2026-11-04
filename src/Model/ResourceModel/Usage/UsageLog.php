@@ -188,7 +188,16 @@ class UsageLog extends AbstractDb implements UsageLogResourceInterface
         // `store_id` in its own grouping key — narrowing here would quietly drop every store but
         // one out of the aggregates and there would be nothing left to notice it by.
         $select = $this->windowSelect($from, $to)
-            ->columns(array_merge(self::AGGREGATE_GROUP_COLUMNS, $this->countAndTotalColumns()))
+            ->columns(array_merge(
+                self::AGGREGATE_GROUP_COLUMNS,
+                $this->countAndTotalColumns(),
+                [
+                    'cost_currency' => new \Zend_Db_Expr('MAX(cost_currency)'),
+                    'price_snapshot' => new \Zend_Db_Expr(
+                        "CASE WHEN COUNT(DISTINCT price_snapshot) > 1 THEN 'mixed' ELSE MAX(price_snapshot) END"
+                    ),
+                ]
+            ))
             ->group(self::AGGREGATE_GROUP_COLUMNS);
 
         $rows = array_map(
@@ -325,6 +334,10 @@ class UsageLog extends AbstractDb implements UsageLogResourceInterface
             'cache_read_tokens' => new \Zend_Db_Expr('SUM(cache_read_tokens)'),
             'cache_write_tokens' => new \Zend_Db_Expr('SUM(cache_write_tokens)'),
             'reasoning_tokens' => new \Zend_Db_Expr('SUM(reasoning_tokens)'),
+            // SUM() ignores NULL and is NULL only when every cost was, so an all-unknown group
+            // stays unknown. COUNT(cost) counts the rows that had a cost, for the partial flag.
+            'cost' => new \Zend_Db_Expr('SUM(cost)'),
+            'priced_calls' => new \Zend_Db_Expr('COUNT(cost)'),
         ];
     }
 
@@ -345,9 +358,22 @@ class UsageLog extends AbstractDb implements UsageLogResourceInterface
             'model' => $this->toStringValue($row['model'] ?? null),
             'consumer' => $this->toStringValue($row['consumer'] ?? null),
             'store_id' => $this->toInt($row['store_id'] ?? 0),
+            'cost_currency' => $this->toNullableString($row['cost_currency'] ?? null),
+            'price_snapshot' => $this->toNullableString($row['price_snapshot'] ?? null),
         ];
 
         return array_merge($labels, $this->castTotals($row));
+    }
+
+    /**
+     * A fetched string column, keeping `null` as `null`.
+     *
+     * @param mixed $value
+     * @return string|null
+     */
+    private function toNullableString(mixed $value): ?string
+    {
+        return is_scalar($value) ? (string) $value : null;
     }
 
     /**

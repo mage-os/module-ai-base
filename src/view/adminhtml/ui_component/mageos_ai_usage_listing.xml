@@ -125,6 +125,21 @@
                 <sortable>true</sortable>
             </settings>
         </column>
+        <column name="cost" sortOrder="115">
+            <settings>
+                <filter>textRange</filter>
+                <dataType>text</dataType>
+                <label translate="true">Estimated Cost (USD)</label>
+                <sortable>true</sortable>
+            </settings>
+        </column>
+        <column name="price_snapshot" sortOrder="116">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Price Snapshot</label>
+                <visible>false</visible>
+            </settings>
+        </column>
         <column name="failed" component="Magento_Ui/js/grid/columns/select" sortOrder="120">
             <settings>
                 <options class="Magento\Config\Model\Config\Source\Yesno"/>

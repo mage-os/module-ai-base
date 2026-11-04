@@ -52,6 +52,38 @@ final class DbSchemaTest extends TestCase
         }
     }
 
+    public function test_it_declares_nullable_cost_columns_so_unknown_is_never_stored_as_zero(): void
+    {
+        foreach ([self::RAW_TABLE, self::DAILY_TABLE] as $tableName) {
+            $cost = $this->getTable($tableName)->xpath('column[@name="cost"]')[0] ?? null;
+            self::assertNotNull($cost, $tableName);
+            self::assertSame('decimal', (string) $cost->attributes('xsi', true)['type'], $tableName);
+            self::assertSame('true', (string) $cost['nullable'], $tableName);
+            self::assertSame('', (string) $cost['default'], $tableName);
+        }
+
+        foreach (['cost_currency', 'price_snapshot'] as $name) {
+            $column = $this->getTable(self::RAW_TABLE)->xpath('column[@name="' . $name . '"]')[0] ?? null;
+            self::assertNotNull($column, $name);
+            self::assertSame('true', (string) $column['nullable'], $name);
+        }
+    }
+
+    public function test_every_cost_column_is_in_the_whitelist(): void
+    {
+        $whitelist = json_decode(
+            (string) file_get_contents(dirname(__DIR__, 3) . '/src/etc/db_schema_whitelist.json'),
+            true
+        );
+
+        foreach (['cost', 'cost_currency', 'price_snapshot'] as $name) {
+            self::assertTrue($whitelist[self::RAW_TABLE]['column'][$name] ?? false, $name);
+        }
+        foreach (['cost', 'priced_calls', 'cost_currency', 'price_snapshot'] as $name) {
+            self::assertTrue($whitelist[self::DAILY_TABLE]['column'][$name] ?? false, $name);
+        }
+    }
+
     public function test_it_declares_cache_read_and_write_columns_on_both_tables(): void
     {
         foreach ([self::RAW_TABLE, self::DAILY_TABLE] as $tableName) {

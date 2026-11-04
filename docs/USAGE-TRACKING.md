@@ -46,9 +46,9 @@ these counts, see [Failed calls and null-token rows](#failed-calls-and-null-toke
   to read back. Also a subset of the prompt count, kept apart from cache read rather than folded into
   one combined "cached" figure, because the two are typically billed at different rates. A cache
   write commonly costs a premium over a fresh prompt token, and a cache read commonly costs a
-  fraction of one. This module states counts, never a computed cost (see
-  [What is never recorded](#what-is-never-recorded) below): check the provider's own pricing page
-  for the rates that actually apply to an account.
+  fraction of one. Cost is estimated from these counts at their own rates (see
+  [Estimated cost](#estimated-cost) below); check the provider's own pricing page for the rates
+  that actually apply to an account.
 - **Reasoning**: the part of the completion the model spent on internal reasoning before writing its
   visible answer, for the providers and models that report it separately. A subset of the completion
   count, not an addition to it.
@@ -101,6 +101,61 @@ row: a provider that never reports cache tokens does not drag a mixed-provider a
 zero, and a period where nothing reported reasoning tokens shows "not reported" rather than a
 reassuring-looking zero.
 
+## Estimated cost
+
+Each recorded call also gets an **estimated cost in USD**, computed once when the row is written
+from the token counts above and a table of public list prices. It is an estimate, and is labelled
+as one everywhere it is shown.
+
+**Where prices come from.** LiteLLM's community-maintained
+[`model_prices_and_context_window.json`](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json),
+downloaded nightly by the `mageos_ai_refresh_prices` cron job (02:30) or on demand with
+`bin/magento mageos:ai:prices:refresh`, and stored trimmed to per-token chat prices in
+`var/mageos_ai/price_snapshot.json`. A failed download keeps the previous snapshot and logs a
+warning. A fresh install has no snapshot until the first refresh, so costs are `n/a` until then.
+This is the module's only outbound request that does not carry credentials.
+
+**Fixed at write time.** The row stores the cost, its currency and the snapshot version
+(`price_snapshot`) it was computed from. Old rows are never recalculated, so a later price change
+does not rewrite history. Changing a price override likewise affects only later calls.
+
+**The formula** (`Model\Pricing\CostCalculator`):
+
+- Cache reads and cache writes are billed at their own rates. They are a subset of the prompt count
+  (the module normalizes Anthropic's separate counts into it, see
+  [Token counts](#token-counts)), so the ordinary-input portion is prompt minus cache read minus
+  cache write; nothing is billed twice.
+- Reasoning tokens are part of the completion count and are billed as output, never added on top.
+- If the price table lists a higher rate above a context-length threshold (for example Gemini and
+  Claude above 200k tokens), the whole call is billed at that rate, as the providers do.
+- **Unknown stays unknown.** No price for the model, no usage reported, a missing prompt or
+  completion count, or a cache count the table has no rate for gives a `NULL` cost, shown as `n/a`.
+  It is never stored or shown as `$0.00`, which would read as "free". Self-hosted backends (Ollama,
+  LM Studio, OpenAI-Compatible) have no list price and are `n/a` unless you add an override.
+
+**Overrides.** *Model Price Overrides* under the usage group takes one model per line,
+`service_code:model input output [cache_read [cache_write]]`, in USD per million tokens, for
+example `openai_compatible:llama-3.3-70b 0.60 0.80`. An override beats the downloaded table, and
+its rows record `override` as their snapshot. Invalid lines are rejected on save.
+
+**Roll-up and totals.** The daily table sums the known costs and also stores `priced_calls`, how
+many of its calls had one. A total where some calls could not be priced shows the sum of the known
+ones and says so, for example `$1.50 (3 of 4 calls priced)`; a total where none could be priced is
+`n/a`. The dashboard, the grid (`Estimated Cost (USD)`) and `bin/magento mageos:ai:usage`
+(`estimated_cost_usd`, `priced_calls` and `estimated_cost_partial` in JSON) all read the same
+figure.
+
+**What it does not include.**
+
+- Batch, flex and priority tiers: only the standard on-demand rates are read.
+- Negotiated or enterprise rates, credits and free tiers.
+- Gateway markups: OpenRouter or a LiteLLM proxy may charge differently from the underlying
+  provider's list price.
+- Per-request extras such as web-search or tool fees.
+- Newly released models, for a few days: the community table can lag a release. Check the
+  provider's own bill for anything you invoice on.
+- Calls made through `PlatformAwareInterface::getPlatform()`, which are not recorded at all.
+
 ## What is never recorded
 
 **No prompt or response content is ever stored.** Not the question asked, not the model's answer,
@@ -112,12 +167,8 @@ careful with elsewhere. See the "Counts only, never content" decision record in
 [docs/ARCHITECTURE.md](ARCHITECTURE.md#decision-record-usage-tracking-scope) for the full
 reasoning.
 
-Two other things it does not do:
+One other thing it does not do:
 
-- **No cost estimate.** Every figure shown is a token count, never a currency amount. Provider
-  prices change constantly and differ per account and negotiated contract, so a computed cost
-  would be a guess dressed up as a fact. Cross-check token counts against the provider's own
-  billing for actual spend.
 - **Calls that bypass this module's client are invisible to it.** A module reaching past
   `AiClientInterface::getPlatform()` (`PlatformAwareInterface`, the documented escape hatch to the
   raw symfony/ai platform) makes calls this module never sees, so they are never recorded. That is
@@ -213,6 +264,7 @@ straight to the report, shown only to a role the report's own ACL would let in.
 | Raw Usage Retention (Days) | `mageos_ai/usage/retention_days` | 30 | How many days of individual calls the cleanup job keeps before rolling them up into daily totals and deleting the detail. Also what bounds the grid — see below. |
 | Daily Usage Retention (Days) | `mageos_ai/usage/daily_retention_days` | 730 | How many days of daily totals the cleanup job keeps before deleting those too. Much longer than the raw retention, since this is what a long-running spend trend relies on once the per-call detail behind it is gone. |
 | Cleanup Cron Schedule | `mageos_ai/usage/cron_expr` | `0 3 * * *` | The cron expression the roll-up/cleanup job runs on. Read directly by Magento's own cron scheduler through `crontab.xml`, not by this module at request time. |
+| Model Price Overrides | `mageos_ai/usage/price_overrides` | empty | Manual per-model prices that beat the downloaded table; see [Estimated cost](#estimated-cost). |
 
 ## Retention
 

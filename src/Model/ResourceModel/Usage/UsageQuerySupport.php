@@ -81,12 +81,18 @@ trait UsageQuerySupport
      * one shape has to serve both the raw log's own totals queries and the roll-up's insert rows
      * without any reshaping in between.
      *
+     * `cost` stays a decimal string (or null): the column is a fixed-point decimal and a PHP float
+     * would round it on the way to the roll-up's insert. `priced_calls` says how many of `calls`
+     * contributed to it, which is what lets a reader tell a partial sum from a complete one.
+     *
      * @param array<array-key,mixed> $row
-     * @return array<string,int|null>
+     * @return array<string,int|string|null>
      */
     private function castTotals(array $row): array
     {
         return [
+            'cost' => $this->toNullableDecimal($row['cost'] ?? null),
+            'priced_calls' => $this->toInt($row['priced_calls'] ?? 0),
             'calls' => $this->toInt($row['calls'] ?? 0),
             'failed_calls' => $this->toInt($row['failed_calls'] ?? 0),
             'input_tokens' => $this->toInt($row['input_tokens'] ?? 0),
@@ -138,6 +144,16 @@ trait UsageQuerySupport
     private function toNullableInt(mixed $value): ?int
     {
         return $value === null ? null : $this->toInt($value);
+    }
+    /**
+     * Narrows a fetched decimal to a plain decimal string, keeping `null` as `null`.
+     *
+     * @param mixed $value
+     * @return string|null
+     */
+    private function toNullableDecimal(mixed $value): ?string
+    {
+        return is_numeric($value) ? (string) $value : null;
     }
     /**
      * Same narrowing as {@see toInt()}, but to a string, for every grouping-key and label column.
