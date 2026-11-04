@@ -41,10 +41,31 @@ test.describe('Model tier cards', () => {
         const model = section.fieldByLabel(0, 'Model');
 
         await expect(model).toBeHidden();
-        await section.row(0).locator('[data-model-advanced-toggle]').click();
+        await section.openModelList(0);
         await model.selectOption('claude-opus-4-7');
 
         await expect(section.row(0).locator('.ai-tier-card.is-selected')).toContainText('Most capable');
+    });
+
+    test('a saved row lights the card of its model after a reload', async ({ page }) => {
+        const section = new AiConfigurationSection(page);
+        await section.open();
+        await section.addProvider('anthropic');
+        await section.row(0).locator('.ai-tier-card', { hasText: 'Fast' }).click();
+        await section.save();
+
+        await expect(section.row(0).locator('.ai-tier-card.is-selected')).toContainText('Fast');
+        await expect(section.fieldByLabel(0, 'Model')).toBeHidden();
+    });
+
+    test('Refresh Models stays visible while the model list is folded away', async ({ page }) => {
+        const section = new AiConfigurationSection(page);
+        await section.open();
+        await section.addProvider('anthropic');
+        await section.save();
+
+        await expect(section.fieldByLabel(0, 'Model')).toBeHidden();
+        await expect(section.fieldRow(0, 'Model').locator('.ai-refresh-models')).toBeVisible();
     });
 
     test('a provider without guidance keeps the plain model field', async ({ page }) => {

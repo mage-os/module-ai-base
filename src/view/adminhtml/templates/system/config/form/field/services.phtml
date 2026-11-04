@@ -274,9 +274,10 @@ require(['prototype'], function () {
      *
      * The cards are radio buttons so the keyboard works as it does in any radio group, but they are
      * bound to a form that does not exist, so they never post: the model field stays the one control
-     * that carries the row's value, and a card only sets it.
+     * that carries the row's value, and a card only sets it. Refresh Models sits on the summary line
+     * rather than with the folded-away list, so it stays as visible as it is on any other row.
      */
-    function buildTierPicker(cards, label) {
+    function buildTierPicker(cards, label, refreshHtml) {
         const group = 'ai-tier-' + (++fieldSequence);
         const cardsHtml = cards.map(function (card) {
             const badge = card.recommended
@@ -297,7 +298,7 @@ require(['prototype'], function () {
             + cardsHtml + '</div>'
             + '<p class="note ai-model-summary"><span data-model-summary></span>'
             + '<button type="button" class="ai-model-advanced-toggle" aria-expanded="false"'
-            + ' data-model-advanced-toggle>{$chooseModelLabelJs}</button></p>'
+            + ' data-model-advanced-toggle>{$chooseModelLabelJs}</button>' + refreshHtml + '</p>'
             + '</div>';
     }
 
@@ -427,13 +428,14 @@ require(['prototype'], function () {
             // A provider that gives guidance is picked by tier: its cards lead, and the full model list
             // waits behind "Choose a specific model". syncRowModel() keeps the two in step.
             const tierCards = field.name === 'model' ? (serviceSchema.tierCards || []) : [];
-            const picker = tierCards.length ? buildTierPicker(tierCards, field.label) : '';
+            const picker = tierCards.length ? buildTierPicker(tierCards, field.label, refresh) : '';
             const advancedAttr = picker ? ' data-model-advanced hidden' : '';
+            const inlineRefresh = picker ? '' : refresh;
 
             return '<tr>'
                 + '<th><label for="' + control.id + '">' + escapeHtml(field.label) + '</label></th>'
                 + '<td>' + picker
-                + '<div class="ai-field-control"' + advancedAttr + '>' + control.html + refresh + '</div></td>'
+                + '<div class="ai-field-control"' + advancedAttr + '>' + control.html + inlineRefresh + '</div></td>'
                 + '</tr>';
         }).join('');
 
