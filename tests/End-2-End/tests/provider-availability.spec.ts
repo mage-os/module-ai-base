@@ -41,7 +41,7 @@ test.describe('Provider availability', () => {
         await section.save();
 
         await expect(section.rows()).toHaveCount(1);
-        await expect(section.fieldByLabel(0, 'Model')).toBeVisible();
+        await expect(section.fieldRow(0, 'Model')).toBeVisible();
     });
 
     test('the guidance sits with the buttons it describes', async ({ page }) => {

@@ -20,6 +20,13 @@
 @ai-refresh-models__border-color: #adadad;
 @ai-refresh-models__color: #514943;
 @ai-refresh-models__hover__background: #e3e3e3;
+@ai-field__padding-top: 12px;
+@ai-tier-card__padding: 10px;
+@ai-tier-card__border-color: #adadad;
+@ai-tier-card__checked__border-color: #1979c3;
+@ai-tier-card__checked__background: #f0f7fd;
+@ai-tier-card-badge__background: #e5f1e3;
+@ai-tier-card-badge__color: #185b00;
 
 //
 //  The Mage-OS configuration tab
@@ -305,6 +312,118 @@
         flex: 1 1 auto;
         min-width: 0;
     }
+}
+
+//
+//  Model picker. Providers that give guidance get one card per tier, with the full model list
+//  folded away under them. The cards wrap to one per line on a narrow screen.
+//
+//  The admin theme bottom-aligns field labels (.admin__control-table th). Against a block of
+//  cards that would leave the model label floating at the foot of the row, so that row's label
+//  is pinned level with the titles of the cards instead.
+//  --------------------------------------------------------------------------
+
+.ai-tier-cards {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    text-align: left;
+}
+
+.ai-tier-card {
+    border: 1px solid @ai-tier-card__border-color;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: @ai-tier-card__padding;
+    position: relative;
+
+    &.is-selected {
+        background: @ai-tier-card__checked__background;
+        border-color: @ai-tier-card__checked__border-color;
+        box-shadow: 0 0 0 1px @ai-tier-card__checked__border-color;
+    }
+
+    &:has(.ai-tier-card-input:focus-visible) {
+        outline: 2px solid @ai-tier-card__checked__border-color;
+        outline-offset: 2px;
+    }
+
+    &:has(.ai-tier-card-input:disabled) {
+        cursor: default;
+        opacity: .75;
+    }
+}
+
+//  The radio stays for the keyboard and screen readers but is not drawn: the admin theme renders
+//  it as a checkbox, and the card's own border already shows which tier is picked.
+.ai-tier-card-input {
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    width: 1px;
+}
+
+.ai-tier-card-title {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    font-weight: 600;
+    gap: 6px;
+}
+
+.ai-tier-card-badge {
+    background: @ai-tier-card-badge__background;
+    border-radius: 10px;
+    color: @ai-tier-card-badge__color;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 8px;
+}
+
+.ai-tier-card-description {
+    color: @ai-service-row-model__color;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.ai-model-summary {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 8px 0 0;
+    text-align: left;
+
+    .ai-refresh-models {
+        margin-left: auto;
+    }
+}
+
+.ai-model-advanced-toggle {
+    background: none;
+    border: 0;
+    color: @ai-tier-card__checked__border-color;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.ai-model-picker + .ai-field-control {
+    margin-top: 8px;
+
+    &[hidden] {
+        display: none;
+    }
+}
+
+tr:has(> td > .ai-model-picker) > th {
+    padding-top: @ai-field__padding-top + @ai-tier-card__padding + 1px;
+    vertical-align: top;
 }
 
 .ai-refresh-models {

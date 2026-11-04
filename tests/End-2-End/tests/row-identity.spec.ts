@@ -22,6 +22,7 @@ test.describe('Row identity', () => {
         const section = new AiConfigurationSection(page);
         await section.open();
         await section.addProvider('anthropic');
+        await section.openModelList(0);
 
         const model = section.fieldByLabel(0, 'Model');
         await model.selectOption({ index: 1 });

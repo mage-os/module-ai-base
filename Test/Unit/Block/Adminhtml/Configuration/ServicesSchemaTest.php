@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace MageOS\AiBase\Test\Unit\Block\Adminhtml\Configuration;
 
+require_once __DIR__ . '/../../../Stubs/FakeFieldDescriptorFactory.php';
+
 use Magento\Config\Block\System\Config\Form\Field\FieldArray\AbstractFieldArray;
 use Magento\Framework\Serialize\Serializer\Json;
+use MageOS\AiBase\AiServices\Anthropic;
 use MageOS\AiBase\Api\Data\AiServiceConfigurationInterface;
 use MageOS\AiBase\Api\Data\FieldDescriptorInterface;
+use MageOS\AiBase\Api\JsonFetcherInterface;
 use MageOS\AiBase\Block\Adminhtml\Configuration\Services;
 use MageOS\AiBase\Model\FieldDescriptor;
 use MageOS\AiBase\Model\ModelList\Resolver;
 use MageOS\AiBase\Model\ServiceRegistry;
+use MageOS\AiBase\Test\Unit\Stubs\FakeFieldDescriptorFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -89,6 +94,52 @@ final class ServicesSchemaTest extends TestCase
         );
 
         self::assertSame([], $schema['ollama']['fields'][0]['options']);
+    }
+
+    public function test_a_guided_provider_brings_one_tier_card_per_tier(): void
+    {
+        $anthropic = $this->anthropic();
+
+        $schema = $this->schemaFor($anthropic, $anthropic->getSupportedModels());
+
+        self::assertSame(
+            ['fast', 'balanced', 'most-capable'],
+            array_column($schema['anthropic']['tierCards'], 'tier')
+        );
+    }
+
+    public function test_a_new_row_of_a_guided_provider_starts_on_the_recommended_model(): void
+    {
+        $anthropic = $this->anthropic();
+
+        $schema = $this->schemaFor($anthropic, $anthropic->getSupportedModels());
+
+        $modelField = array_values(array_filter(
+            $schema['anthropic']['fields'],
+            static fn (array $field): bool => $field['name'] === 'model'
+        ))[0];
+        self::assertSame('claude-sonnet-5-5', $modelField['default']);
+    }
+
+    public function test_a_provider_without_guidance_keeps_the_plain_model_field(): void
+    {
+        $schema = $this->schemaFor(
+            $this->service('openai', [$this->field('model', FieldDescriptorInterface::TYPE_SELECT)]),
+            ['gpt-4o' => 'GPT-4o']
+        );
+
+        self::assertSame([], $schema['openai']['tierCards']);
+        self::assertNull($schema['openai']['fields'][0]['default']);
+    }
+
+    private function anthropic(): Anthropic
+    {
+        return new Anthropic(new FakeFieldDescriptorFactory(), new class implements JsonFetcherInterface {
+            public function getJson(string $url, #[\SensitiveParameter] array $headers = []): array
+            {
+                return [];
+            }
+        });
     }
 
     /**
@@ -172,6 +223,7 @@ final class ServicesSchemaTest extends TestCase
 
         $reflection->getProperty('serviceRegistry')->setValue($block, new ServiceRegistry([$service]));
         $reflection->getProperty('modelListResolver')->setValue($block, $this->modelListResolver);
+        $reflection->getProperty('modelOptions')->setValue($block, new \MageOS\AiBase\Model\ModelList\ModelOptions());
 
         return $block;
     }

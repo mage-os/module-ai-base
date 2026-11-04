@@ -133,6 +133,7 @@ final class ServicesButtonsTest extends TestCase
             $codes
         )));
         $reflection->getProperty('modelListResolver')->setValue($block, $this->modelListResolver);
+        $reflection->getProperty('modelOptions')->setValue($block, new \MageOS\AiBase\Model\ModelList\ModelOptions());
         $reflection->getProperty('bridgeRegistry')->setValue($block, $this->bridgeRegistry);
 
         return $block;
@@ -207,6 +208,7 @@ final class ServicesButtonsTest extends TestCase
 
         $reflection->getProperty('serviceRegistry')->setValue($block, new ServiceRegistry([$service]));
         $reflection->getProperty('modelListResolver')->setValue($block, $this->modelListResolver);
+        $reflection->getProperty('modelOptions')->setValue($block, new \MageOS\AiBase\Model\ModelList\ModelOptions());
         $reflection->getProperty('bridgeRegistry')->setValue($block, $this->bridgeRegistry);
 
         return $block;

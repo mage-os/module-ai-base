@@ -118,10 +118,29 @@ export class AiConfigurationSection {
         return field;
     }
 
+    /**
+     * The control that saves a field. The tier cards in front of a guided model field are radio
+     * inputs that never post, so they are not it.
+     */
     fieldByLabel(index: number, label: string): Locator {
-        return this.row(index).locator('tr', { has: this.page.locator(`th label:text-is("${label}")`) })
-            .locator('input, select')
+        return this.fieldRow(index, label)
+            .locator('input:not(.ai-tier-card-input), select')
             .first();
+    }
+
+    fieldRow(index: number, label: string): Locator {
+        return this.row(index).locator('tr', { has: this.page.locator(`th label:text-is("${label}")`) });
+    }
+
+    /**
+     * Unfold the full model list of a row whose model field leads with tier cards; a no-op for a
+     * row with a plain model field.
+     */
+    async openModelList(index: number): Promise<void> {
+        const toggle = this.row(index).locator('[data-model-advanced-toggle][aria-expanded="false"]');
+        if (await toggle.count() > 0) {
+            await toggle.click();
+        }
     }
 
     async addProvider(code: string): Promise<void> {

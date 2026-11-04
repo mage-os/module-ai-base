@@ -52,7 +52,7 @@ test.describe('Row actions', () => {
         await section.addProvider('anthropic');
         await section.save();
 
-        await expect(section.row(0).locator('.ai-field-control .ai-refresh-models')).toBeVisible();
+        await expect(section.fieldRow(0, 'Model').locator('.ai-refresh-models')).toBeVisible();
         await expect(section.row(0).locator('.col-actions .ai-refresh-models')).toHaveCount(0);
         await expect(section.row(0).locator('.ai-refresh-models')).toHaveAttribute('title', 'Refresh Models');
     });

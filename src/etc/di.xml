@@ -4,6 +4,7 @@
     <preference for="MageOS\AiBase\Api\AiServiceSelectorInterface" type="MageOS\AiBase\Model\AiServiceSelector"/>
     <preference for="MageOS\AiBase\Api\Data\AiServiceInterface" type="MageOS\AiBase\Model\AiService"/>
     <preference for="MageOS\AiBase\Api\Data\FieldDescriptorInterface" type="MageOS\AiBase\Model\FieldDescriptor"/>
+    <preference for="MageOS\AiBase\Api\Data\ModelGuidanceInterface" type="MageOS\AiBase\Model\ModelGuidance"/>
     <preference for="MageOS\AiBase\Api\AiClientFactoryInterface" type="MageOS\AiBase\Model\Client\ClientFactory"/>
     <preference for="MageOS\AiBase\Api\JsonFetcherInterface" type="MageOS\AiBase\Model\ModelList\HttpFetcher"/>
     <!-- For other modules' data patches moving their own saved credentials into this module. -->
