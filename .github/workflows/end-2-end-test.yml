@@ -96,9 +96,19 @@ jobs:
             -v "$(pwd)/magento-logs:/data/var/log" \
             ghcr.io/controlaltdelete-nl/magento2-in-a-box/${{ matrix.IMAGE }}:${{ matrix.TAG }}
 
+      # Mage-OS 4.0.0 and up ship Mago, which requires this module at ^1.0, so the image already
+      # has a released version installed. The uploaded copy is a canonical path repository, so it
+      # has to carry that version or nothing satisfies Mago's constraint.
       - name: Upload the module into the container
         run: |
           sed -i '/version/d' ./composer.json
+          SHIPPED_VERSION=$(docker exec store composer show --format=json mage-os/module-ai-base 2>/dev/null \
+            | jq -r '.versions[0] // empty | ltrimstr("v")' || true)
+          if [ -n "$SHIPPED_VERSION" ]; then
+            echo "The image ships mage-os/module-ai-base $SHIPPED_VERSION"
+            jq --arg version "$SHIPPED_VERSION" '.version = $version' composer.json > /tmp/composer.json
+            mv /tmp/composer.json composer.json
+          fi
           docker cp $(pwd) store:/data/extensions/
           docker exec store ./install-composer-package mage-os/module-ai-base:@dev
 
