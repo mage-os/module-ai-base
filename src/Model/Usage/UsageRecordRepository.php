@@ -189,6 +189,9 @@ class UsageRecordRepository implements UsageRecordRepositoryInterface, UsageReco
             'cache_read_tokens' => $record->getCacheReadTokens(),
             'cache_write_tokens' => $record->getCacheWriteTokens(),
             'reasoning_tokens' => $record->getReasoningTokens(),
+            'cost' => $record->getCost() === null ? null : number_format($record->getCost(), 10, '.', ''),
+            'cost_currency' => $record->getCost() === null ? null : $record->getCostCurrency(),
+            'price_snapshot' => $record->getCost() === null ? null : $record->getPriceSnapshot(),
             'streamed' => $record->isStreamed() ? 1 : 0,
             'failed' => $record->isFailed() ? 1 : 0,
         ];

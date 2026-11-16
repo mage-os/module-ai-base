@@ -72,6 +72,10 @@ $changeCssClass = $changePercent !== null && $changePercent >= 0.0
         </div>
 
         <dl class="mageos-ai-usage-dashboard-stats">
+            <div class="mageos-ai-usage-dashboard-stat mageos-ai-usage-dashboard-cost">
+                <dt><?= $escaper->escapeHtml(__('Estimated cost')) ?></dt>
+                <dd><?= $escaper->escapeHtml($block->getFormattedCost()) ?></dd>
+            </div>
             <div class="mageos-ai-usage-dashboard-stat">
                 <dt><?= $escaper->escapeHtml(__('Failed calls')) ?></dt>
                 <dd><?= $escaper->escapeHtml((string) $block->getFailedCalls()) ?></dd>
@@ -85,6 +89,9 @@ $changeCssClass = $changePercent !== null && $changePercent >= 0.0
                 <dd><?= $escaper->escapeHtml($block->getFormattedCacheWriteTokens()) ?></dd>
             </div>
         </dl>
+        <p class="mageos-ai-usage-dashboard-cost-note">
+            <?= $escaper->escapeHtml($block->getCostDisclaimer()) ?>
+        </p>
 
         <?php if ($block->hasTrend()): ?>
             <section class="mageos-ai-usage-dashboard-breakdown mageos-ai-usage-dashboard-trend">

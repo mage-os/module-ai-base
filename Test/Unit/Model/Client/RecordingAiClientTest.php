@@ -34,6 +34,11 @@ use MageOS\AiBase\Model\Client\RecordingAiClient;
 use MageOS\AiBase\Model\Client\RecordingPlatformAwareAiClient;
 use MageOS\AiBase\Model\Usage\UsageStoreResolver;
 use PHPUnit\Framework\Attributes\TestWith;
+use MageOS\AiBase\Model\Pricing\CostCalculator;
+use MageOS\AiBase\Model\Pricing\CostEstimator;
+use MageOS\AiBase\Model\Pricing\ModelPrice;
+use MageOS\AiBase\Model\Pricing\PriceCatalog;
+use MageOS\AiBase\Model\Pricing\PriceQuote;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use MageOS\AiBase\Test\Unit\Stubs\RecordingLogger;
@@ -571,6 +576,89 @@ final class RecordingAiClientTest extends TestCase
         unset($stream);
 
         self::assertCount(1, $this->logger->getRecords());
+    }
+
+    public function test_it_records_the_estimated_cost_and_the_snapshot_it_came_from(): void
+    {
+        $delegate = new FakeAiClient(
+            chatResponse: new ChatResponse('Hi', [], new TokenUsage(1000, 500, 1500)),
+            serviceCode: 'openai',
+            model: 'gpt-4o',
+        );
+
+        $this->subjectWithPrice($delegate, new ModelPrice(0.000002, 0.00001))->chat($this->request());
+
+        $saved = $this->repository->getSavedRecords()[0];
+        self::assertEqualsWithDelta(0.007, $saved->getCost(), 1e-12);
+        self::assertSame('USD', $saved->getCostCurrency());
+        self::assertSame('snap-1', $saved->getPriceSnapshot());
+    }
+
+    public function test_it_records_an_unknown_cost_as_null_when_the_model_has_no_price(): void
+    {
+        $delegate = new FakeAiClient(chatResponse: new ChatResponse('Hi', [], new TokenUsage(10, 5)));
+
+        $this->subjectWithPrice($delegate, null)->chat($this->request());
+
+        $saved = $this->repository->getSavedRecords()[0];
+        self::assertNull($saved->getCost());
+        self::assertNull($saved->getCostCurrency());
+        self::assertNull($saved->getPriceSnapshot());
+    }
+
+    public function test_a_failed_call_with_no_usage_has_an_unknown_cost(): void
+    {
+        $delegate = new FakeAiClient();
+        $delegate->givenChatThrows(new \RuntimeException('boom'));
+
+        try {
+            $this->subjectWithPrice($delegate, new ModelPrice(1.0, 1.0))->chat($this->request());
+            self::fail('expected the delegate exception');
+        } catch (\RuntimeException) {
+            self::assertNull($this->repository->getSavedRecords()[0]->getCost());
+        }
+    }
+
+    public function test_a_pricing_failure_never_costs_the_row_or_the_response(): void
+    {
+        $catalog = $this->createStub(PriceCatalog::class);
+        $catalog->method('find')->willThrowException(new \RuntimeException('catalog down'));
+        $delegate = new FakeAiClient(chatResponse: new ChatResponse('Hi', [], new TokenUsage(10, 5)));
+        $client = new RecordingAiClient(
+            $delegate,
+            $this->repository,
+            new UsageStoreResolver(
+                new FakeStoreManager(1),
+                new FakeAppState(Area::AREA_FRONTEND),
+                $this->storeResolverLogger,
+            ),
+            $this->logger,
+            new CostEstimator($catalog, new CostCalculator()),
+        );
+
+        $response = $client->chat($this->request());
+
+        self::assertSame('Hi', $response->getText());
+        self::assertCount(1, $this->repository->getSavedRecords());
+        self::assertNull($this->repository->getSavedRecords()[0]->getCost());
+    }
+
+    private function subjectWithPrice(FakeAiClient $delegate, ?ModelPrice $price): RecordingAiClient
+    {
+        $catalog = $this->createStub(PriceCatalog::class);
+        $catalog->method('find')->willReturn($price === null ? null : new PriceQuote($price, 'snap-1'));
+
+        return new RecordingAiClient(
+            $delegate,
+            $this->repository,
+            new UsageStoreResolver(
+                new FakeStoreManager(1),
+                new FakeAppState(Area::AREA_FRONTEND),
+                $this->storeResolverLogger,
+            ),
+            $this->logger,
+            new CostEstimator($catalog, new CostCalculator()),
+        );
     }
 
     private function subject(

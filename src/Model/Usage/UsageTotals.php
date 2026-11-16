@@ -24,6 +24,8 @@ class UsageTotals implements UsageTotalsInterface
      * @param int|null $reasoningTokens {@see UsageTotalsInterface::getReasoningTokens()}
      * @param int|null $cacheWriteTokens {@see UsageTotalsInterface::getCacheWriteTokens()}
      * @param int $failedCalls {@see UsageTotalsInterface::getFailedCalls()}
+     * @param float|null $cost {@see UsageTotalsInterface::getCost()}
+     * @param int $pricedCalls {@see UsageTotalsInterface::getPricedCalls()}
      */
     public function __construct(
         private readonly int $calls,
@@ -34,7 +36,33 @@ class UsageTotals implements UsageTotalsInterface
         private readonly ?int $reasoningTokens,
         private readonly ?int $cacheWriteTokens = null,
         private readonly int $failedCalls = 0,
+        private readonly ?float $cost = null,
+        private readonly int $pricedCalls = 0,
     ) {
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getCost(): ?float
+    {
+        return $this->cost;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getPricedCalls(): int
+    {
+        return $this->pricedCalls;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function isCostPartial(): bool
+    {
+        return $this->cost !== null && $this->pricedCalls < $this->calls;
     }
 
     /**

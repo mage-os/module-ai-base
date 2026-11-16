@@ -73,6 +73,14 @@
                         <field id="enabled">1</field>
                     </depends>
                 </field>
+                <field id="price_overrides" translate="label comment" type="textarea" sortOrder="50" showInDefault="1">
+                    <label>Model Price Overrides</label>
+                    <backend_model>MageOS\AiBase\Model\Config\Backend\PriceOverrides</backend_model>
+                    <comment><![CDATA[Optional. One model per line: <code>service_code:model input output [cache_read [cache_write]]</code>, USD per million tokens, for example <code>openai_compatible:llama-3.3-70b 0.60 0.80</code>. Beats the downloaded price table. Costs are estimates from public list prices; batch discounts, negotiated rates and gateway markups are not reflected.]]></comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
                 <field id="cron_expr" translate="label comment" type="text" sortOrder="40" showInDefault="1"
                        canRestore="1">
                     <label>Cleanup Cron Schedule</label>

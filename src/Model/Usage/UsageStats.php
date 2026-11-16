@@ -10,6 +10,7 @@ use MageOS\AiBase\Api\Data\UsageBreakdownInterface;
 use MageOS\AiBase\Api\Data\UsageTotalsInterface;
 use MageOS\AiBase\Api\UsageRecordRepositoryInterface;
 use MageOS\AiBase\Api\UsageStatsInterface;
+use MageOS\AiBase\Model\Pricing\CostCalculator;
 
 /**
  * Implementation of {@see UsageStatsInterface}.
@@ -345,6 +346,8 @@ class UsageStats implements UsageStatsInterface
             reasoningTokens: $this->toNullableInt($summed['reasoning_tokens']),
             cacheWriteTokens: $this->toNullableInt($summed['cache_write_tokens']),
             failedCalls: (int) $summed['failed_calls'],
+            cost: $summed['cost'] === null ? null : round((float) $summed['cost'], CostCalculator::SCALE),
+            pricedCalls: (int) $summed['priced_calls'],
         );
     }
 
@@ -377,6 +380,11 @@ class UsageStats implements UsageStatsInterface
                 $this->toNullableInt($left['reasoning_tokens']),
                 $this->toNullableInt($right['reasoning_tokens'])
             ),
+            // Same rule as the token columns: null only when neither side had a known cost, so an
+            // unknown never turns into a zero that reads as free. Rows from the raw and the daily
+            // table are disjoint (see dailyWindowEnd()), so adding them cannot double-count.
+            'cost' => $this->addNullableDecimal($left['cost'] ?? null, $right['cost'] ?? null),
+            'priced_calls' => (int) ($left['priced_calls'] ?? 0) + (int) ($right['priced_calls'] ?? 0),
         ];
     }
 
@@ -425,7 +433,25 @@ class UsageStats implements UsageStatsInterface
             'cache_read_tokens' => null,
             'cache_write_tokens' => null,
             'reasoning_tokens' => null,
+            'cost' => null,
+            'priced_calls' => 0,
         ];
+    }
+
+    /**
+     * Adds two nullable decimal costs, staying null only when both sides are.
+     *
+     * @param int|string|null $left
+     * @param int|string|null $right
+     * @return string|null
+     */
+    private function addNullableDecimal(int|string|null $left, int|string|null $right): ?string
+    {
+        if ($left === null && $right === null) {
+            return null;
+        }
+
+        return number_format((float) $left + (float) $right, CostCalculator::SCALE, '.', '');
     }
 
     /**

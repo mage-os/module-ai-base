@@ -8,6 +8,7 @@ use MageOS\AiBase\Api\Data\Period;
 use MageOS\AiBase\Api\Data\UsageBreakdownInterface;
 use MageOS\AiBase\Api\Data\UsageTotalsInterface;
 use MageOS\AiBase\Api\UsageStatsInterface;
+use MageOS\AiBase\Model\Pricing\CostFormatter;
 use MageOS\AiBase\Model\Usage\UsageConfig;
 use MageOS\AiBase\Model\Usage\UsageTotals;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
@@ -65,12 +66,14 @@ class UsageReport extends Command
      * @param \DateTimeImmutable|null $now Deterministic clock for tests, exactly like the role
      *        {@see Period}'s own named constructors give their own `$now` argument. Production
      *        callers leave this null and get the real current instant.
+     * @param CostFormatter $costFormatter Renders the estimated cost, `n/a` when unknown
      */
     public function __construct(
         private readonly UsageStatsInterface $usageStats,
         private readonly UsageConfig $usageConfig,
         private readonly TimezoneInterface $timezone,
         private readonly ?\DateTimeImmutable $now = null,
+        private readonly CostFormatter $costFormatter = new CostFormatter(),
     ) {
         parent::__construct();
     }
@@ -222,7 +225,10 @@ class UsageReport extends Command
      *     cache_read_tokens: int|null,
      *     cache_write_tokens: int|null,
      *     reasoning_tokens: int|null,
-     *     failed_calls: int
+     *     failed_calls: int,
+     *     estimated_cost_usd: float|null,
+     *     priced_calls: int,
+     *     estimated_cost_partial: bool
      * }
      */
     private function totalsToArray(UsageTotalsInterface $totals): array
@@ -236,6 +242,9 @@ class UsageReport extends Command
             'cache_write_tokens' => $totals->getCacheWriteTokens(),
             'reasoning_tokens' => $totals->getReasoningTokens(),
             'failed_calls' => $totals->getFailedCalls(),
+            'estimated_cost_usd' => $totals->getCost(),
+            'priced_calls' => $totals->getPricedCalls(),
+            'estimated_cost_partial' => $totals->isCostPartial(),
         ];
     }
 
@@ -273,6 +282,7 @@ class UsageReport extends Command
             'Cache write tokens',
             'Reasoning tokens',
             'Failed',
+            'Estimated cost',
         ]);
         $totalsTable->addRow([
             $totals->getCalls(),
@@ -283,8 +293,10 @@ class UsageReport extends Command
             $totals->getCacheWriteTokens() ?? '-',
             $totals->getReasoningTokens() ?? '-',
             $totals->getFailedCalls(),
+            $this->costFormatter->formatTotals($totals),
         ]);
         $totalsTable->render();
+        $output->writeln('Cost is an estimate from public list prices; n/a means unknown, not free.');
 
         if ($consumerFilter !== null) {
             return;
@@ -294,7 +306,9 @@ class UsageReport extends Command
         $output->writeln('By consumer:');
 
         $breakdownTable = new Table($output);
-        $breakdownTable->setHeaders(['Consumer', 'Calls', 'Input tokens', 'Output tokens', 'Total tokens']);
+        $breakdownTable->setHeaders(
+            ['Consumer', 'Calls', 'Input tokens', 'Output tokens', 'Total tokens', 'Estimated cost']
+        );
         foreach ($consumerRows as $row) {
             $breakdownTable->addRow([
                 $row->getGroupValue(),
@@ -302,6 +316,7 @@ class UsageReport extends Command
                 $row->getTotals()->getInputTokens(),
                 $row->getTotals()->getOutputTokens(),
                 $row->getTotals()->getTotalTokens(),
+                $this->costFormatter->formatTotals($row->getTotals()),
             ]);
         }
         $breakdownTable->render();

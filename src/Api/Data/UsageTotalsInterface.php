@@ -77,6 +77,30 @@ interface UsageTotalsInterface
     public function getReasoningTokens(): ?int;
 
     /**
+     * Estimated cost in USD, summed over the covered calls that had a known cost.
+     *
+     * Null, not zero, when no covered call had one: unknown is not free. It is an estimate from
+     * public list prices at the time each call was recorded; see {@see isCostPartial()}.
+     *
+     * @return float|null
+     */
+    public function getCost(): ?float;
+
+    /**
+     * Number of covered calls that contributed to {@see getCost()}.
+     *
+     * @return int
+     */
+    public function getPricedCalls(): int;
+
+    /**
+     * Whether {@see getCost()} leaves out some covered calls because their cost was unknown.
+     *
+     * @return bool
+     */
+    public function isCostPartial(): bool;
+
+    /**
      * Number of calls the totals cover that {@see \MageOS\AiBase\Api\Data\UsageRecordInterface::isFailed()}.
      *
      * Counted separately from, not subtracted out of, {@see getCalls()}: a failed call still used a

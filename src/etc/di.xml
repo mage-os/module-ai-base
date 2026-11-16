@@ -600,6 +600,7 @@
         <arguments>
             <argument name="commands" xsi:type="array">
                 <item name="mageos_ai_usage_report" xsi:type="object">MageOS\AiBase\Console\Command\UsageReport</item>
+                <item name="mageos_ai_prices_refresh" xsi:type="object">MageOS\AiBase\Console\Command\RefreshPrices</item>
             </argument>
         </arguments>
     </type>

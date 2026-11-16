@@ -14,6 +14,7 @@ use MageOS\AiBase\Api\UsageRecordRepositoryInterface;
 use MageOS\AiBase\Exceptions\AiRequestNotSentException;
 use MageOS\AiBase\Model\Chat\ChatMessage;
 use MageOS\AiBase\Model\Chat\ChatRequest;
+use MageOS\AiBase\Model\Pricing\CostEstimator;
 use MageOS\AiBase\Model\Usage\UsageRecord;
 use MageOS\AiBase\Model\Usage\UsageStoreResolver;
 use Psr\Log\LoggerInterface;
@@ -48,12 +49,15 @@ class RecordingAiClient implements AiClientInterface
      * @param LoggerInterface $logger A recording failure is logged here rather than thrown, since
      *        a problem writing the log must never turn an AI call that already succeeded into one
      *        the caller sees as failed
+     * @param CostEstimator|null $costEstimator Prices the call at write time; null leaves every cost
+     *        unknown, which keeps a hand-built decorator (a test, a third party) working unchanged
      */
     public function __construct(
         private readonly AiClientInterface $delegate,
         private readonly UsageRecordRepositoryInterface $repository,
         private readonly UsageStoreResolver $storeResolver,
         private readonly LoggerInterface $logger,
+        private readonly ?CostEstimator $costEstimator = null,
     ) {
     }
 
@@ -246,6 +250,10 @@ class RecordingAiClient implements AiClientInterface
         bool $failed,
     ): void {
         try {
+            // Priced once, here, so the figure is fixed by the price table in force at call time and
+            // a later refresh never moves it. A failed call with partial usage is priced from what
+            // the provider reported, which is what it billed.
+            $estimate = $this->costEstimator?->estimate($this->delegate->getServiceCode(), $model, $usage);
             $this->repository->save(new UsageRecord(
                 serviceId: $this->delegate->getServiceId(),
                 serviceCode: $this->delegate->getServiceCode(),
@@ -260,6 +268,9 @@ class RecordingAiClient implements AiClientInterface
                 streamed: $streamed,
                 cacheWriteTokens: $usage?->getCacheWriteTokens(),
                 failed: $failed,
+                cost: $estimate?->cost,
+                costCurrency: $estimate?->currency,
+                priceSnapshot: $estimate?->snapshot,
             ));
         } catch (\Throwable $e) {
             $this->logger->error(

@@ -31,6 +31,9 @@ class UsageRecord implements UsageRecordInterface
      * @param string|null $createdAt {@see UsageRecordInterface::getCreatedAt()}
      * @param int|null $cacheWriteTokens {@see UsageRecordInterface::getCacheWriteTokens()}
      * @param bool $failed {@see UsageRecordInterface::isFailed()}
+     * @param float|null $cost {@see UsageRecordInterface::getCost()}
+     * @param string|null $costCurrency {@see UsageRecordInterface::getCostCurrency()}
+     * @param string|null $priceSnapshot {@see UsageRecordInterface::getPriceSnapshot()}
      */
     public function __construct(
         private readonly string $serviceId,
@@ -48,7 +51,34 @@ class UsageRecord implements UsageRecordInterface
         private readonly ?string $createdAt = null,
         private readonly ?int $cacheWriteTokens = null,
         private readonly bool $failed = false,
+        private readonly ?float $cost = null,
+        private readonly ?string $costCurrency = null,
+        private readonly ?string $priceSnapshot = null,
     ) {
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getCost(): ?float
+    {
+        return $this->cost;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getCostCurrency(): ?string
+    {
+        return $this->costCurrency;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getPriceSnapshot(): ?string
+    {
+        return $this->priceSnapshot;
     }
 
     /**

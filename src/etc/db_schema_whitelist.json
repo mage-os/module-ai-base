@@ -16,7 +16,10 @@
             "created_at": true,
             "cache_read_tokens": true,
             "cache_write_tokens": true,
-            "failed": true
+            "failed": true,
+            "cost": true,
+            "cost_currency": true,
+            "price_snapshot": true
         },
         "index": {
             "MAGEOS_AI_USAGE_LOG_CREATED_AT": true,
@@ -44,7 +47,11 @@
             "reasoning_tokens": true,
             "cache_read_tokens": true,
             "cache_write_tokens": true,
-            "failed_calls": true
+            "failed_calls": true,
+            "cost": true,
+            "priced_calls": true,
+            "cost_currency": true,
+            "price_snapshot": true
         },
         "index": {
             "MAGEOS_AI_USAGE_DAILY_CONSUMER": true,

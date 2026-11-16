@@ -287,6 +287,53 @@ final class UsageStatsTest extends TestCase
         self::assertSame(0, $failedCallsByConsumer['docs_search']);
     }
 
+    public function test_it_sums_the_cost_of_both_tables_without_double_counting(): void
+    {
+        $this->rawUsageRepository->addRow($this->rawRow(['created_at' => '2026-02-15 08:00:00', 'cost' => '0.5000000000']));
+        $this->dailyUsageReport->addRow($this->dailyRow(['usage_date' => '2026-01-10', 'cost' => '1.2500000000', 'priced_calls' => 1]));
+        $this->dailyUsageReport->addRow($this->dailyRow(['usage_date' => '2026-02-15', 'cost' => '999', 'priced_calls' => 1]));
+
+        $totals = $this->subject->getTotals($this->period('2026-01-01 00:00:00', '2026-03-01 00:00:00'));
+
+        self::assertSame(1.75, $totals->getCost());
+        self::assertSame(2, $totals->getPricedCalls());
+        self::assertFalse($totals->isCostPartial());
+    }
+
+    public function test_cost_is_unknown_not_zero_when_no_call_was_priced(): void
+    {
+        $this->rawUsageRepository->addRow($this->rawRow(['created_at' => '2026-01-10 00:00:00']));
+
+        $totals = $this->subject->getTotals($this->period('2026-01-01 00:00:00', '2026-02-01 00:00:00'));
+
+        self::assertNull($totals->getCost());
+        self::assertFalse($totals->isCostPartial());
+    }
+
+    public function test_a_mix_of_priced_and_unpriced_calls_sums_the_known_and_is_marked_partial(): void
+    {
+        $this->rawUsageRepository->addRow($this->rawRow(['created_at' => '2026-01-10 00:00:00', 'cost' => '0.2000000000']));
+        $this->rawUsageRepository->addRow($this->rawRow(['created_at' => '2026-01-11 00:00:00']));
+
+        $totals = $this->subject->getTotals($this->period('2026-01-01 00:00:00', '2026-02-01 00:00:00'));
+
+        self::assertSame(0.2, $totals->getCost());
+        self::assertSame(1, $totals->getPricedCalls());
+        self::assertSame(2, $totals->getCalls());
+        self::assertTrue($totals->isCostPartial());
+    }
+
+    public function test_it_carries_cost_into_each_consumer_breakdown_row(): void
+    {
+        $this->rawUsageRepository->addRow($this->rawRow(['created_at' => '2026-01-10 00:00:00', 'consumer' => 'chat', 'cost' => '0.1000000000']));
+        $this->dailyUsageReport->addRow($this->dailyRow(['usage_date' => '2026-01-05', 'consumer' => 'docs', 'total_tokens' => 150]));
+
+        $rows = $this->subject->getByConsumer($this->period('2026-01-01 00:00:00', '2026-02-01 00:00:00'));
+
+        self::assertNull($rows[0]->getTotals()->getCost());
+        self::assertSame(0.1, $rows[1]->getTotals()->getCost());
+    }
+
     private function period(string $start, string $end): Period
     {
         return Period::between(
@@ -822,10 +869,16 @@ final class FakeRawUsageRepository implements UsageRecordRepositoryInterface, Us
             'cache_read_tokens' => null,
             'cache_write_tokens' => null,
             'reasoning_tokens' => null,
+            'cost' => null,
+            'priced_calls' => 0,
         ];
 
         foreach ($rows as $row) {
             $totals['calls']++;
+            if (($row['cost'] ?? null) !== null) {
+                $totals['cost'] = number_format((float) ($totals['cost'] ?? 0) + (float) $row['cost'], 10, '.', '');
+                $totals['priced_calls']++;
+            }
             $totals['failed_calls'] += (int) $row['failed_calls'];
             $totals['input_tokens'] += (int) $row['input_tokens'];
             $totals['output_tokens'] += (int) $row['output_tokens'];
@@ -1011,10 +1064,16 @@ final class FakeDailyUsageReport implements UsageDailyReportInterface
             'cache_read_tokens' => null,
             'cache_write_tokens' => null,
             'reasoning_tokens' => null,
+            'cost' => null,
+            'priced_calls' => 0,
         ];
 
         foreach ($rows as $row) {
             $totals['calls'] += (int) $row['calls'];
+            if (($row['cost'] ?? null) !== null) {
+                $totals['cost'] = number_format((float) ($totals['cost'] ?? 0) + (float) $row['cost'], 10, '.', '');
+            }
+            $totals['priced_calls'] += (int) ($row['priced_calls'] ?? 0);
             $totals['failed_calls'] += (int) $row['failed_calls'];
             $totals['input_tokens'] += (int) $row['input_tokens'];
             $totals['output_tokens'] += (int) $row['output_tokens'];
