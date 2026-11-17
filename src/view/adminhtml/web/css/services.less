@@ -516,3 +516,31 @@
         opacity: .75;
     }
 }
+
+//
+//  Advanced fields sit collapsed under a summary line inside the row's field table, so a row
+//  reads as the fields it usually needs.
+//  --------------------------------------------------------------------------
+
+.ai-service-advanced-row > td {
+    padding: 0;
+}
+
+.ai-service-advanced {
+    margin-top: 4px;
+
+    > summary {
+        cursor: pointer;
+        font-weight: 600;
+        padding: 6px 0;
+    }
+
+    > .ai-service-row-fields {
+        width: 100%;
+
+        > tbody > tr > th {
+            white-space: nowrap;
+            width: 1px;
+        }
+    }
+}

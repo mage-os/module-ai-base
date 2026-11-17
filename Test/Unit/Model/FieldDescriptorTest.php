@@ -25,6 +25,36 @@ final class FieldDescriptorTest extends TestCase
         self::assertNull($field->getDefault());
         self::assertFalse($field->isEncrypted());
         self::assertFalse($field->isEndpoint());
+        self::assertNull($field->getPlaceholder());
+        self::assertFalse($field->isAdvanced());
+    }
+
+    /**
+     * A placeholder only hints at the fallback, so it is carried apart from the stored default.
+     */
+    public function test_placeholder_is_carried_without_becoming_a_default(): void
+    {
+        $field = new FieldDescriptor(
+            name: 'completions_path',
+            label: 'Completions Path',
+            type: FieldDescriptorInterface::TYPE_TEXT,
+            placeholder: '/v1/chat/completions',
+        );
+
+        self::assertSame('/v1/chat/completions', $field->getPlaceholder());
+        self::assertNull($field->getDefault());
+    }
+
+    public function test_advanced_flag_is_carried(): void
+    {
+        $field = new FieldDescriptor(
+            name: 'completions_path',
+            label: 'Completions Path',
+            type: FieldDescriptorInterface::TYPE_TEXT,
+            advanced: true,
+        );
+
+        self::assertTrue($field->isAdvanced());
     }
 
     /**

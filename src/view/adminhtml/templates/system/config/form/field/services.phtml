@@ -196,6 +196,7 @@ $_isReadOnly = $block->isReadOnly();
     $refreshLabelJs = $escaper->escapeJs(__('Refresh Models'));
     $refreshingLabelJs = $escaper->escapeJs(__('Refreshing...'));
     $modelsLabelJs = $escaper->escapeJs(__('models'));
+    $advancedLabelJs = $escaper->escapeJs(__('Advanced'));
     // Every value placed in the script goes through encodeForScript() or escapeJs(). A stored value
     // or a provider's model name containing "<!--<script>" otherwise switched the HTML parser into a
     // state where it swallowed the closing tag, so the script never ran and no row rendered.
@@ -299,7 +300,8 @@ require(['prototype'], function () {
                     + buildOptions(field.options, field.default) + '</select>',
             };
         }
-        const defaultAttr = field.default ? ' value="' + escapeHtml(field.default) + '"' : '';
+        const defaultAttr = (field.default ? ' value="' + escapeHtml(field.default) + '"' : '')
+            + (field.placeholder ? ' placeholder="' + escapeHtml(field.placeholder) + '"' : '');
         const inputType = (field.type === 'password' || field.type === 'text') ? field.type : 'text';
         const type = field.encrypted ? 'password' : inputType;
         // Credentials are not the administrator's own password. Browsers ignore "off" on a password
@@ -373,7 +375,7 @@ require(['prototype'], function () {
             + '</div></td>'
             + '</tr>';
 
-        const rows = nameRow + fields.map(function (field) {
+        const fieldRow = function (field) {
             const control = buildField(serviceCode, rowId, field);
             const refresh = (canRefresh && field.name === 'model')
                 ? '<button type="button" class="ai-refresh-models action-refresh-models"'
@@ -389,7 +391,20 @@ require(['prototype'], function () {
                 + '<th><label for="' + control.id + '">' + escapeHtml(field.label) + '</label></th>'
                 + '<td><div class="ai-field-control">' + control.html + refresh + '</div></td>'
                 + '</tr>';
-        }).join('');
+        };
+
+        // Fields most administrators never touch (a gateway's non-standard paths) stay collapsed,
+        // so the row reads as the handful of fields it usually needs. A <details> nested in its own
+        // field table keeps every input posting under the same name, and findField() still finds it.
+        const advancedFields = fields.filter(function (field) { return field.advanced; });
+        const advancedRow = advancedFields.length === 0 ? '' : '<tr class="ai-service-advanced-row">'
+            + '<td colspan="2"><details class="ai-service-advanced" data-row-advanced="' + escapeHtml(rowId) + '">'
+            + '<summary>{$advancedLabelJs}</summary>'
+            + '<table class="ai-service-row-fields">' + advancedFields.map(fieldRow).join('') + '</table>'
+            + '</details></td></tr>';
+        const rows = nameRow
+            + fields.filter(function (field) { return !field.advanced; }).map(fieldRow).join('')
+            + advancedRow;
 
         // Stored rows (they arrive with an existingRowId) get a Test Connection
         // button; unsaved rows cannot be tested because the client factory only
@@ -481,11 +496,32 @@ require(['prototype'], function () {
                 }
                 el.value = values[key];
             });
+            openAdvancedWhenSet(rowId, serviceCode, fields);
             syncRowModel(rowId, serviceCode);
             syncRowHeading(rowId, serviceCode, serviceName);
         }
 
         return rowId;
+    }
+
+    /**
+     * Open a row's Advanced section when any field in it holds a value.
+     *
+     * A collapsed section would otherwise hide that the row departs from the defaults, which is
+     * the first thing to check when a gateway answers with a 404.
+     */
+    function openAdvancedWhenSet(rowId, serviceCode, fields) {
+        const hasAdvancedValue = fields.some(function (field) {
+            if (!field.advanced) return false;
+            const el = findField(rowId, serviceCode, field.name);
+            return Boolean(el && el.value);
+        });
+        if (!hasAdvancedValue) return;
+
+        const container = document.querySelector('.ai-services-configurator');
+        const details = container ? Array.from(container.querySelectorAll('details[data-row-advanced]'))
+            .find(function (el) { return el.getAttribute('data-row-advanced') === rowId; }) : null;
+        if (details) details.open = true;
     }
 
     /**

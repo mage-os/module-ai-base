@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Refresh Models for OpenAI-Compatible** (`openai_compatible`): the row now reads the gateway's
+  live model list from `{base_url}/v1/models`, sending the API key as a Bearer token only when one
+  is stored. Any OpenAI-compatible gateway (LiteLLM, Cheaper Inference, Eden AI, ...) gets a model
+  list without a provider of its own. A gateway without that endpoint shows the fetch error and the
+  model field stays free text.
+- **Custom paths for OpenAI-Compatible**: a collapsed **Advanced** section on the row holds
+  **Completions Path** and **Embeddings Path**, for a gateway that does not serve its routes at
+  `/v1`. Empty fields keep the bridge defaults (`/v1/chat/completions`, `/v1/embeddings`), shown as
+  placeholders, so existing rows are unaffected. A path always gets a leading slash, so it cannot
+  point the request at another host.
+- `FieldDescriptorInterface::getPlaceholder()` and `isAdvanced()`: a provider can show a fallback
+  in an empty field without storing it, and collapse rarely needed fields under **Advanced**.
+
+### Changed
+- `AiServices\OpenAiCompatible` takes a `JsonFetcherInterface` as a second constructor argument.
+  DI supplies it; only code that constructs the class with `new` needs to pass one.
+
 ## [1.1.0] - 2026-10-27
 
 ### Added

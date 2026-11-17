@@ -110,7 +110,7 @@ final class ClientFactoryTest extends TestCase
         return new ServiceRegistry([
             new Ollama($fieldFactory, $modelListFetcher),
             new LmStudio($fieldFactory, $modelListFetcher),
-            new OpenAiCompatible($fieldFactory),
+            new OpenAiCompatible($fieldFactory, $modelListFetcher),
             new Azure($fieldFactory),
             new Opper($fieldFactory, $modelListFetcher),
             new OpenCode($fieldFactory, $modelListFetcher),
@@ -614,6 +614,80 @@ final class ClientFactoryTest extends TestCase
 
         self::assertSame('https://litellm.internal:4000', RecordingGenericFactory::$baseUrl);
         self::assertSame('sk-local', RecordingGenericFactory::$apiKey);
+    }
+
+    /**
+     * A gateway that serves its OpenAI-compatible routes somewhere other than /v1 is reached
+     * through the row's own paths, not a provider class of its own.
+     */
+    public function test_create_passes_the_rows_own_paths_to_the_openai_compatible_bridge(): void
+    {
+        $this->createOpenAiCompatibleWithPaths('/v3/compat/chat/completions', '/v3/compat/embeddings');
+
+        self::assertSame('/v3/compat/chat/completions', RecordingGenericFactory::$completionsPath);
+        self::assertSame('/v3/compat/embeddings', RecordingGenericFactory::$embeddingsPath);
+    }
+
+    /**
+     * Empty path fields are the placeholder case: the bridge keeps its own /v1 defaults, as rows
+     * saved before the fields existed do.
+     */
+    public function test_empty_paths_leave_the_bridge_defaults_in_place(): void
+    {
+        $this->createOpenAiCompatibleWithPaths('', '  ');
+
+        self::assertSame('/v1/chat/completions', RecordingGenericFactory::$completionsPath);
+        self::assertSame('/v1/embeddings', RecordingGenericFactory::$embeddingsPath);
+    }
+
+    public function test_a_path_without_a_leading_slash_gets_one(): void
+    {
+        $this->createOpenAiCompatibleWithPaths('v3/chat/completions', '//v3/embeddings');
+
+        self::assertSame('/v3/chat/completions', RecordingGenericFactory::$completionsPath);
+        self::assertSame('/v3/embeddings', RecordingGenericFactory::$embeddingsPath);
+    }
+
+    /**
+     * Glued straight onto the base URL, `@other.example` would make the configured host the
+     * userinfo of a URL pointing at another host, and the key would go there.
+     */
+    public function test_a_path_cannot_move_the_request_to_another_host(): void
+    {
+        $this->createOpenAiCompatibleWithPaths('@other.example/v1/chat/completions', '');
+
+        self::assertSame(
+            'https://litellm.internal:4000/@other.example/v1/chat/completions',
+            RecordingGenericFactory::$baseUrl . RecordingGenericFactory::$completionsPath,
+        );
+    }
+
+    /**
+     * Build an OpenAI-compatible client whose row holds the given paths.
+     *
+     * @param string $completionsPath
+     * @param string $embeddingsPath
+     * @return void
+     */
+    private function createOpenAiCompatibleWithPaths(string $completionsPath, string $embeddingsPath): void
+    {
+        $this->serviceSelector->method('getByCode')->with('openai_compatible')->willReturn([
+            new AiService('row_compat', 'openai_compatible', [
+                'base_url'         => 'https://litellm.internal:4000',
+                'api_key'          => 'sk-local',
+                'model'            => 'local-model',
+                'completions_path' => $completionsPath,
+                'embeddings_path'  => $embeddingsPath,
+            ]),
+        ]);
+        $this->clientFactory->method('create')->willReturn($this->createMock(SymfonyAiClient::class));
+
+        $this->newSubject(new BridgeRegistry([
+            'openai_compatible' => [
+                'factory' => RecordingGenericFactory::class,
+                'package' => 'symfony/ai-generic-platform',
+            ],
+        ]))->create('openai_compatible');
     }
 
     /**

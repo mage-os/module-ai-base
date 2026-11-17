@@ -92,14 +92,16 @@ of use without deleting its key.
 | Hugging Face | API Key, Model (free text) |
 | Ollama | Base URL (default `http://localhost:11434`), Model (free text) |
 | LM Studio | Base URL (default `http://localhost:1234`), Model (free text) |
-| OpenAI-Compatible | Base URL, API Key, Model (free text) |
+| OpenAI-Compatible | Base URL, API Key, Model (free text); under Advanced: Completions Path, Embeddings Path (default `/v1/...`) |
 | Opper | API Key, Model (free text) |
 | OpenCode Zen | API Key, Base URL (default `https://opencode.ai/zen`), Model (free text) |
 | OpenCode Custom | Base URL (default `http://127.0.0.1:4096`), Username (default `opencode`), Server Password, Agent, Model (free text) |
 
 API keys are encrypted and shown as `******` once saved. **Refresh Models** replaces a row's model
 suggestions with the provider's live list, for OpenAI, Anthropic, Gemini, OpenRouter, Opper, Ollama,
-LM Studio, OpenCode Zen and OpenCode Custom.
+LM Studio, OpenCode Zen, OpenCode Custom and OpenAI-Compatible. For OpenAI-Compatible it reads
+`{base_url}/v1/models`, which most gateways serve; one that does not shows the error and the model
+field stays free text.
 
 ### Stores > Configuration > Mage-OS > AI Configuration > Usage Tracking
 
