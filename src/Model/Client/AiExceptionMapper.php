@@ -102,14 +102,18 @@ class AiExceptionMapper
     /**
      * Whether the exception is of any of the given classes.
      *
+     * Checks each class itself rather than through {@see isInstanceOf()}: that method's template
+     * resolves to `object` for a plain class-string, which made PHPStan read every call from here
+     * as always true. The existence guard is the same one, so an absent bridge still never matches.
+     *
      * @param \Throwable $exception
-     * @param list<class-string> $classes
+     * @param list<string> $classes
      * @return bool
      */
     private function isAnyInstanceOf(\Throwable $exception, array $classes): bool
     {
         foreach ($classes as $class) {
-            if ($this->isInstanceOf($exception, $class)) {
+            if ((class_exists($class) || interface_exists($class)) && $exception instanceof $class) {
                 return true;
             }
         }
