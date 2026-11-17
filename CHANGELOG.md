@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Current Claude models in the Anthropic defaults**: Claude Fable 5.1, Opus 5.5, Sonnet 5.5 and
+  Haiku 5.5 are now in the curated model list, so they can be picked without a **Refresh Models**
+  first.
+
 ## [1.1.0] - 2026-10-27
 
 ### Added
