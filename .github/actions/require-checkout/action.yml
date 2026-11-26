@@ -1,0 +1,40 @@
+name: Require the checked out module
+description: >-
+  Adds the checkout as a path repository to a Magento project and requires it. Mage-OS 4.0.0 and up
+  ship Mago, which requires this module at ^1.0. A path repository is canonical, so a checkout
+  that only carries dev-main hides every release and nothing satisfies Mago's constraint. The
+  checkout is therefore stamped with the newest released version before it is required.
+
+inputs:
+  magento-path:
+    description: The Magento project directory, as output by the setup-magento action.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Stamp the checkout with the newest released version
+      shell: bash
+      working-directory: ${{ inputs.magento-path }}
+      env:
+        MODULE_PATH: ${{ github.workspace }}
+      run: |
+        PACKAGE=$(jq -r .name "$MODULE_PATH/composer.json")
+        RELEASED_VERSION=$(composer show --available --format=json "$PACKAGE" \
+          | jq -r '[.versions[] | select(test("^v?[0-9]+\\.[0-9]+\\.[0-9]+$"))][0] // empty | ltrimstr("v")')
+        if [ -z "$RELEASED_VERSION" ]; then
+          echo "::error::No released version of $PACKAGE found to stamp the checkout with"
+          exit 1
+        fi
+        echo "Stamping the $PACKAGE checkout with $RELEASED_VERSION"
+        jq --arg version "$RELEASED_VERSION" '.version = $version' "$MODULE_PATH/composer.json" > /tmp/composer.json
+        mv /tmp/composer.json "$MODULE_PATH/composer.json"
+
+    - name: Require the checkout
+      shell: bash
+      working-directory: ${{ inputs.magento-path }}
+      env:
+        MODULE_PATH: ${{ github.workspace }}
+      run: |
+        composer config repositories.local path "$MODULE_PATH"
+        composer require "$(jq -r .name "$MODULE_PATH/composer.json"):@dev" --no-install
