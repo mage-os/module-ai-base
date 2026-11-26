@@ -12,6 +12,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # The default mirror (https://mirror.mage-os.org/) only proxies magento/* packages; the
+  # mage-os/project-community-edition metapackage is published to https://repo.mage-os.org/.
+  # Without this, composer fails with "Could not find package mage-os/project-community-edition".
+  MAGE_OS_REPOSITORY: https://repo.mage-os.org/
+
 jobs:
   # Resolved fresh on every run, since this repo keeps no lock file: it audits what a store
   # installing the module today would get. Abandoned packages are reported, not failed on, because
@@ -135,16 +141,167 @@ jobs:
       - name: Run tests that need the AI platform
         run: vendor/bin/phpunit -c phpunit.xml.dist --testsuite Platform --fail-on-skipped
 
-  check-extension:
+  # The unit, compile and integration jobs of graycoreio's check-extension workflow, for Mage-OS.
+  # That reusable workflow cannot be used here: Mage-OS ships Mago, which requires this module at
+  # ^1.0, and the workflow requires the checkout as dev-main from a canonical path repository, so
+  # nothing satisfies Mago. These jobs stamp the checkout with the released version first (see
+  # .github/actions/require-checkout). Its coding-standard job runs in check-extension-lowest.
+  compute-mage-os-jobs:
     needs: compute-matrix
-    uses: graycoreio/github-actions-magento2/.github/workflows/check-extension.yaml@a65d0e50647829a9f6f972d72d87054a9c848fe0 # v8.9.0
-    with:
-      matrix: ${{ needs.compute-matrix.outputs.matrix }}
-      # The default mirror (https://mirror.mage-os.org/) only proxies magento/*
-      # packages; the mage-os/project-community-edition metapackage is published
-      # to https://repo.mage-os.org/. Without this override, composer fails with
-      # "Could not find package mage-os/project-community-edition".
-      magento_repository: https://repo.mage-os.org/
+    runs-on: ubuntu-latest
+    outputs:
+      resolved: ${{ steps.resolve.outputs.resolved }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: graycoreio/github-actions-magento2/resolve-check-config@a65d0e50647829a9f6f972d72d87054a9c848fe0 # v8.9.0
+        id: resolve
+        with:
+          kind: extension
+          matrix: ${{ needs.compute-matrix.outputs.matrix }}
+
+  mage-os-unit-tests:
+    name: Unit tests (${{ matrix.magento }})
+    needs: compute-mage-os-jobs
+    if: ${{ fromJSON(needs.compute-mage-os-jobs.outputs.resolved)['unit-test-extension'].enabled != false }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.compute-mage-os-jobs.outputs.resolved)['unit-test-extension'].matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: graycoreio/github-actions-magento2/setup-magento@a65d0e50647829a9f6f972d72d87054a9c848fe0 # v8.9.0
+        id: setup-magento
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v${{ matrix.composer }}
+          mode: extension
+          magento_version: ${{ matrix.magento }}
+          magento_repository: ${{ env.MAGE_OS_REPOSITORY }}
+
+      - uses: ./.github/actions/require-checkout
+        with:
+          magento-path: ${{ steps.setup-magento.outputs.path }}
+
+      - name: Composer install
+        working-directory: ${{ steps.setup-magento.outputs.path }}
+        run: composer install
+        env:
+          COMPOSER_MIRROR_PATH_REPOS: 1
+
+      - name: Register the module's unit tests
+        working-directory: ${{ steps.setup-magento.outputs.path }}
+        run: |
+          cat > /tmp/testsuite.xml << 'EOF'
+                  <testsuite name="Extension_Unit_Tests">
+                      <directory>../../../vendor/mage-os/module-ai-base/Test/Unit</directory>
+                  </testsuite>
+          EOF
+          sed -i '/<testsuites>/r /tmp/testsuite.xml' dev/tests/unit/phpunit.xml.dist
+          sed -i '/<extensions>/,/<\/extensions>/d' dev/tests/unit/phpunit.xml.dist
+
+      - name: Run unit tests
+        working-directory: ${{ steps.setup-magento.outputs.path }}
+        run: vendor/bin/phpunit -c dev/tests/unit/phpunit.xml.dist --testsuite Extension_Unit_Tests
+
+  mage-os-compile:
+    name: Compile (${{ matrix.magento }})
+    needs: compute-mage-os-jobs
+    if: ${{ fromJSON(needs.compute-mage-os-jobs.outputs.resolved)['compile-extension'].enabled != false }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.compute-mage-os-jobs.outputs.resolved)['compile-extension'].matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: graycoreio/github-actions-magento2/setup-magento@a65d0e50647829a9f6f972d72d87054a9c848fe0 # v8.9.0
+        id: setup-magento
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v${{ matrix.composer }}
+          mode: extension
+          magento_version: ${{ matrix.magento }}
+          magento_repository: ${{ env.MAGE_OS_REPOSITORY }}
+
+      - uses: ./.github/actions/require-checkout
+        with:
+          magento-path: ${{ steps.setup-magento.outputs.path }}
+
+      - name: Composer install
+        working-directory: ${{ steps.setup-magento.outputs.path }}
+        run: composer install
+        env:
+          COMPOSER_MIRROR_PATH_REPOS: 1
+
+      - uses: graycoreio/github-actions-magento2/setup-di-compile@a65d0e50647829a9f6f972d72d87054a9c848fe0 # v8.9.0
+        with:
+          path: ${{ steps.setup-magento.outputs.path }}
+
+  mage-os-integration-tests:
+    name: Integration tests (${{ matrix.magento }})
+    needs: compute-mage-os-jobs
+    if: ${{ fromJSON(needs.compute-mage-os-jobs.outputs.resolved)['integration_test'].enabled != false }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.compute-mage-os-jobs.outputs.resolved)['integration_test'].matrix }}
+    services: ${{ matrix.services }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: graycoreio/github-actions-magento2/setup-magento@a65d0e50647829a9f6f972d72d87054a9c848fe0 # v8.9.0
+        id: setup-magento
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v${{ matrix.composer }}
+          mode: extension
+          magento_version: ${{ matrix.magento }}
+          magento_repository: ${{ env.MAGE_OS_REPOSITORY }}
+
+      - uses: ./.github/actions/require-checkout
+        with:
+          magento-path: ${{ steps.setup-magento.outputs.path }}
+
+      - name: Composer install
+        working-directory: ${{ steps.setup-magento.outputs.path }}
+        run: composer install
+        env:
+          COMPOSER_MIRROR_PATH_REPOS: 1
+
+      - name: Point the integration config at the service containers
+        working-directory: ${{ steps.setup-magento.outputs.path }}/dev/tests/integration
+        run: |
+          sed -i "s/'db-host' => 'localhost'/'db-host' => '127.0.0.1'/" etc/install-config-mysql.php.dist
+          sed -i "s/'db-user' => 'root'/'db-user' => 'user'/" etc/install-config-mysql.php.dist
+          sed -i "s/'db-password' => '123123q'/'db-password' => 'password'/" etc/install-config-mysql.php.dist
+          sed -i "s/'elasticsearch-host' => 'localhost'/'elasticsearch-host' => '127.0.0.1'/" etc/install-config-mysql.php.dist
+          sed -i "s/'amqp-host' => 'localhost'/'amqp-host' => '127.0.0.1'/" etc/install-config-mysql.php.dist
+
+      - name: Enable log-bin-trust-function-creators
+        run: mysql -h127.0.0.1 -uroot -prootpassword -e "SET GLOBAL log_bin_trust_function_creators = 1;"
+
+      - name: Register the module's integration tests
+        working-directory: ${{ steps.setup-magento.outputs.path }}
+        run: |
+          cat > /tmp/testsuite.xml << 'EOF'
+                  <testsuite name="Extension_Integration_Tests">
+                      <directory>../../../vendor/mage-os/module-ai-base/Test/Integration</directory>
+                  </testsuite>
+          EOF
+          sed -i '/<testsuites>/r /tmp/testsuite.xml' dev/tests/integration/phpunit.xml.dist
+
+      - name: Run integration tests
+        working-directory: ${{ steps.setup-magento.outputs.path }}/dev/tests/integration
+        run: ../../../vendor/bin/phpunit -c phpunit.xml.dist --testsuite Extension_Integration_Tests
 
   check-extension-lowest:
     needs: compute-lowest-matrix
